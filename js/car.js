@@ -10,6 +10,7 @@ import {
   CAR,
   SKINS,
   BOOST,
+  DRIFT,
   clamp
 } from './config.js';
 
@@ -392,41 +393,52 @@ export class Car {
       this.boostAmount = Math.min(BOOST.max, this.boostAmount + BOOST.idleRegen * dt);
     }
 
-    // ----- Steering -----
-    const steerInput = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+    // ----- Steering (analog: input.steer in -1..1, or left/right fallback) -----
+    let steerInput = 0;
+    if (typeof input.steer === 'number' && isFinite(input.steer)) {
+      steerInput = clamp(input.steer, -1, 1);
+    } else {
+      steerInput = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+    }
     const speedAbs = Math.abs(this.speed);
-    const speedFactor = Math.min(1, speedAbs / 15);
-    const sign = this.speed >= 0 ? 1 : -1;
-    const turnRate = CAR.speedGiro * (Math.PI / 180) * speedFactor * sign;
+    // Steering stays responsive at cruising speed instead of collapsing to zero.
+    const speedFactor = clamp(0.35 + (speedAbs / Math.max(1, CAR.maxSpeed)) * 0.65, 0, 1);
 
+    // ----- Drift -----
+    const driftCfg = (typeof DRIFT !== 'undefined') ? DRIFT : { grip: 0.3, yawBoost: 1.25, minSpeed: 8 };
+    this.drifting = !!input.drift && speedAbs >= driftCfg.minSpeed && Math.abs(steerInput) > 0.05;
+    this.driftIntensity = this.drifting ? Math.abs(steerInput) : 0;
+
+    const yawBoost = this.drifting ? driftCfg.yawBoost : 1;
+    const turnRate = CAR.speedGiro * (Math.PI / 180) * speedFactor * yawBoost;
     this.heading -= steerInput * turnRate * dt;
 
     this.steerTarget = -steerInput * 0.5;
     this.steer += (this.steerTarget - this.steer) * Math.min(1, dt * 10);
 
-    // ----- Longitudinal speed -----
+    // ----- Longitudinal speed (AUTO-ACCELERATE like the original) -----
     const maxSpeed = CAR.maxSpeed * (this.boostActive ? BOOST.speedMult : 1);
-
-    if (input.gas) {
-      this.speed += CAR.accel * dt;
-    } else if (input.brake) {
+    const minCruise = CAR.maxSpeed * 0.25;
+    if (input.brake) {
       this.speed -= CAR.brakeDecel * dt;
     } else {
-      const decel = CAR.coastDecel * dt;
-      if (this.speed > 0) this.speed = Math.max(0, this.speed - decel);
-      else if (this.speed < 0) this.speed = Math.min(0, this.speed + decel);
+      // Always drive forward; gas adds a stronger push, boost adds more.
+      const accel = CAR.accel * 0.65 + (input.gas ? CAR.accel : 0) + (this.boostActive ? CAR.accel * 0.5 : 0);
+      this.speed += accel * dt;
     }
-    this.speed = clamp(this.speed, -CAR.reverseMax, maxSpeed);
+    // Never fully stop while the game is playing.
+    this.speed = clamp(this.speed, minCruise, maxSpeed);
 
     this.braking = !!input.brake;
 
     // ----- Body roll / pitch -----
-    const rollTarget = -steerInput * 0.11 * speedFactor;
+    const rollTarget = -steerInput * 0.11 * speedFactor * (this.drifting ? 1.35 : 1);
     this.roll += (rollTarget - this.roll) * Math.min(1, dt * 8);
 
     let pitchTarget = 0;
     if (input.brake) pitchTarget = -0.05;
-    else if (input.gas) pitchTarget = 0.025;
+    else if (this.boostActive) pitchTarget = 0.03;
+    else pitchTarget = 0.012;
     this.pitch += (pitchTarget - this.pitch) * Math.min(1, dt * 6);
 
     // ----- Position -----

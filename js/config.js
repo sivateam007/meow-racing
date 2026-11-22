@@ -252,11 +252,18 @@ export const INPUT = {
   steerRight: ['ArrowRight', 'KeyD'],
   gas: ['ArrowUp', 'KeyW'],
   brake: ['ArrowDown', 'KeyS'],
-  turbo: ['Space'],
+  turbo: ['Space', 'ArrowUp', 'KeyW'],
+  boost: ['Space', 'ArrowUp', 'KeyW'],
+  drift: ['ShiftLeft', 'ShiftRight'],
+  pause: ['KeyP', 'Escape'],
   start: ['Enter'],
   restart: ['KeyR'],
-  cycleColor: ['KeyC']
+  cycleColor: ['KeyC'],
+  mute: ['KeyM']
 };
+
+export const DRIFT = { grip: 0.25, yawBoost: 1.35, smokeRate: 0.05, minSpeed: 8 };
+export const ANALOG = { dragSensitivity: 0.0035, maxSteer: 1 };
 
 // -----------------------------------------------------------------------------
 // CAR COLORS (legacy — SKINS is the authoritative list now)

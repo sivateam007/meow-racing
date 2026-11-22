@@ -17,6 +17,7 @@ import {
   LEVELS,
   PERF_TIERS,
   SKINS,
+  ANALOG,
   getLevelById,
   clamp,
   lerp
@@ -167,6 +168,7 @@ export class Game {
       settingsBtn: el('settings-button'),
       helpPanel: el('help-panel'),
       settingsPanel: el('settings-panel'),
+      pause: el('pause-overlay'),
       menuCoins: el('menu-wallet-coins'),
       menuCrowns: el('menu-wallet-crowns'),
       levelCompleteBanner: el('level-complete-banner')
@@ -216,13 +218,21 @@ export class Game {
       const code = e.code;
       const preventCodes = [
         ...INPUT.gas, ...INPUT.brake, ...INPUT.steerLeft, ...INPUT.steerRight,
-        ...INPUT.turbo, ...INPUT.start, ...INPUT.restart
+        ...INPUT.turbo, ...(INPUT.boost || []), ...(INPUT.drift || []),
+        ...(INPUT.pause || []), ...INPUT.start, ...INPUT.restart
       ];
       if (preventCodes.includes(code)) e.preventDefault();
+      const wasDown = !!this.keys[code];
       this.keys[code] = true;
 
-      if (INPUT.start.includes(code)) this._onStartInput();
-      if (INPUT.restart.includes(code)) this._onRestartInput();
+      // Pause toggle (only on the initial press)
+      if (!wasDown && (INPUT.pause || []).includes(code)) this._togglePause();
+
+      if (!wasDown && INPUT.start.includes(code)) this._onStartInput();
+      if (!wasDown && INPUT.restart.includes(code)) this._onRestartInput();
+      if (!wasDown && (INPUT.cycleColor || []).includes(code) && this.car && this.car.cycleColor) {
+        this.car.cycleColor();
+      }
     });
 
     window.addEventListener('keyup', (e) => {
@@ -231,8 +241,40 @@ export class Game {
 
     window.addEventListener('blur', () => {
       this.keys = {};
-      this.touch = { left: false, right: false, gas: false, brake: false, turbo: false };
+      this.touch = { left: false, right: false, gas: false, brake: false, turbo: false, drift: false };
+      this.analogSteer = 0;
+      document.querySelectorAll('.touch-btn.active').forEach((b) => b.classList.remove('active'));
     });
+
+    // Analog steering: drag horizontally anywhere on the canvas to steer.
+    this.analogSteer = 0;
+    const canvas = this.renderer && this.renderer.domElement;
+    if (canvas) {
+      let dragId = null;
+      let startX = 0;
+      const sensitivity = (ANALOG && ANALOG.dragSensitivity) || 0.0035;
+      const maxSteer = (ANALOG && ANALOG.maxSteer) || 1;
+      canvas.addEventListener('pointerdown', (e) => {
+        if (dragId !== null) return;
+        dragId = e.pointerId;
+        startX = e.clientX;
+        this.analogSteer = 0;
+        try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+      });
+      canvas.addEventListener('pointermove', (e) => {
+        if (e.pointerId !== dragId) return;
+        this.analogSteer = clamp((e.clientX - startX) * sensitivity, -maxSteer, maxSteer);
+      });
+      const end = (e) => {
+        if (dragId !== null && e.pointerId !== dragId) return;
+        dragId = null;
+        this.analogSteer = 0;
+        try { if (canvas.hasPointerCapture && canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId); } catch (_) {}
+      };
+      canvas.addEventListener('pointerup', end);
+      canvas.addEventListener('pointercancel', end);
+      canvas.addEventListener('lostpointercapture', () => { dragId = null; this.analogSteer = 0; });
+    }
 
     // Menu buttons
     if (this.overlays.goBtn) {
@@ -275,12 +317,13 @@ export class Game {
       this.overlays.prizeClaim.addEventListener('click', () => this._claimPrize());
     }
 
-    // Touch buttons
+    // Touch buttons (pointer events: finger + mouse + stylus, multi-touch safe)
     this._bindTouchButton('touch-left', 'left');
     this._bindTouchButton('touch-right', 'right');
     this._bindTouchButton('touch-gas', 'gas');
     this._bindTouchButton('touch-brake', 'brake');
     this._bindTouchButton('touch-turbo', 'turbo');
+    this._bindTouchButton('touch-drift', 'drift');
   }
 
   _bindTouchButton(id, key) {
@@ -288,27 +331,48 @@ export class Game {
     if (!elBtn) return;
     const set = (v) => (e) => {
       if (e && e.preventDefault) e.preventDefault();
+      if (e && e.stopPropagation) e.stopPropagation();
       this.touch[key] = v;
       elBtn.classList.toggle('active', v);
     };
-    elBtn.addEventListener('touchstart', set(true), { passive: false });
-    elBtn.addEventListener('touchend', set(false), { passive: false });
-    elBtn.addEventListener('touchcancel', set(false), { passive: false });
-    elBtn.addEventListener('mousedown', set(true));
-    elBtn.addEventListener('mouseup', set(false));
-    elBtn.addEventListener('mouseleave', set(false));
+    elBtn.addEventListener('pointerdown', (e) => {
+      set(true)(e);
+      try { elBtn.setPointerCapture(e.pointerId); } catch (_) {}
+    });
+    elBtn.addEventListener('pointerup', (e) => {
+      set(false)(e);
+      try { if (elBtn.hasPointerCapture && elBtn.hasPointerCapture(e.pointerId)) elBtn.releasePointerCapture(e.pointerId); } catch (_) {}
+    });
+    elBtn.addEventListener('pointercancel', set(false));
+    elBtn.addEventListener('lostpointercapture', set(false));
   }
 
   _readInput() {
     const k = this.keys;
-    const has = (arr) => arr.some((c) => k[c]);
+    const has = (arr) => (arr || []).some((c) => k[c]);
+    const left = has(INPUT.steerLeft) || this.touch.left;
+    const right = has(INPUT.steerRight) || this.touch.right;
+    const keySteer = (right ? 1 : 0) - (left ? 1 : 0);
+    const steer = Math.abs(this.analogSteer || 0) > 0.01 ? this.analogSteer : keySteer;
+    const boost = has(INPUT.boost) || has(INPUT.turbo) || this.touch.turbo;
     return {
-      left: has(INPUT.steerLeft) || this.touch.left,
-      right: has(INPUT.steerRight) || this.touch.right,
+      left,
+      right,
+      steer,
       gas: has(INPUT.gas) || this.touch.gas,
       brake: has(INPUT.brake) || this.touch.brake,
-      turbo: has(INPUT.turbo) || this.touch.turbo
+      turbo: boost,
+      boost,
+      drift: has(INPUT.drift) || this.touch.drift
     };
+  }
+
+  _togglePause() {
+    this.paused = !this.paused;
+    if (this.overlays && this.overlays.pause) {
+      this.overlays.pause.style.display = this.paused ? 'flex' : 'none';
+    }
+    document.body.classList.toggle('is-paused', !!this.paused);
   }
 
   // ===========================================================================
@@ -972,8 +1036,10 @@ export class Game {
       this.world.update(dt, this.car.group.position.z, this.car.group.position.x);
       this.effects.update(dt, this.car, 0);
     } else if (this.state === STATE.PLAY || this.state === STATE.CHECKPOINT) {
-      this._updateGameplay(dt, input);
-      this._updateChaseCamera(dt);
+      if (!this.paused) {
+        this._updateGameplay(dt, input);
+        this._updateChaseCamera(dt);
+      }
     } else if (this.state === STATE.LEVEL_COMPLETE || this.state === STATE.PRIZE) {
       this.car.update(dt, { left: false, right: false, gas: false, brake: false, turbo: false }, false);
       this.world.update(dt, this.car.group.position.z, this.car.group.position.x);
