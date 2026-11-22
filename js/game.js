@@ -1,80 +1,72 @@
 // js/game.js
-// Meow Racing — main loop, state machine, input, camera, scoring, HUD.
-// Ties together Car, World, Effects and drives the game with the verified
-// FullSpeed Racing constants from config.js.
+// Meow Racing — main loop, state machine, level manager, camera, HUD, shop.
+// Boots Three.js, ties together Car / World / Effects / Shop / Storage and
+// drives the game through MENU → LEVEL_SELECT → PLAY → LEVEL_COMPLETE →
+// PRIZE → (next level | WIN), plus GAME_OVER and SHOP.
 
 import * as THREE from 'three';
 import anime from 'animejs';
 import {
   CAR,
   CAMERA,
-  WORLD,
   STATE,
   UI,
   INPUT,
   SCORE,
-  SPAWN,
-  PICKUPS,
-  EFFECTS,
-  RENDER,
-  WIN_DISTANCE,
+  BOOST,
+  LEVELS,
+  PERF_TIERS,
+  SKINS,
+  getLevelById,
   clamp,
-  lerp,
-  randRange
+  lerp
 } from './config.js';
 import { Car } from './car.js';
 import { World } from './world.js';
 import { Effects } from './effects.js';
+import { Shop } from './shop.js';
+import { Storage } from './storage.js';
 
-const TWO_PI = Math.PI * 2;
+function el(id) {
+  return document.getElementById(id);
+}
+
+function detectTouch() {
+  if (typeof window === 'undefined') return false;
+  if ('ontouchstart' in window) return true;
+  if (navigator && navigator.maxTouchPoints > 0) return true;
+  if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) return true;
+  return false;
+}
 
 export class Game {
   constructor() {
-    // DOM refs
-    this.canvas = document.getElementById('game-canvas');
-    this.hud = {
-      root: document.getElementById('hud'),
-      coins: document.getElementById('hud-coins'),
-      crowns: document.getElementById('hud-crowns'),
-      score: document.getElementById('hud-score'),
-      speed: document.getElementById('hud-speed'),
-      time: document.getElementById('hud-time'),
-      lives: document.getElementById('hud-lives'),
-      turbo: document.getElementById('hud-turbo-fill'),
-      distance: document.getElementById('hud-distance')
-    };
-    this.overlays = {
-      menu: document.getElementById('menu-overlay'),
-      gameOver: document.getElementById('game-over-overlay'),
-      win: document.getElementById('win-overlay'),
-      goBtn: document.getElementById('go-button'),
-      restartBtn: document.getElementById('restart-button'),
-      winRestartBtn: document.getElementById('win-restart-button'),
-      finalScore: document.getElementById('final-score'),
-      winScore: document.getElementById('win-score'),
-      helpBtn: document.getElementById('help-button'),
-      settingsBtn: document.getElementById('settings-button'),
-      helpPanel: document.getElementById('help-panel'),
-      settingsPanel: document.getElementById('settings-panel')
-    };
+    this.canvas = el('game-canvas');
+    if (!this.canvas) throw new Error('Missing #game-canvas');
 
-    // Renderer
+    this.isTouch = detectTouch();
+    this.perfTier = this.isTouch ? PERF_TIERS.mobile : PERF_TIERS.desktop;
+
+    // ----- Renderer -----
     this.renderer = new THREE.WebGLRenderer({
       canvas: this.canvas,
-      antialias: RENDER.antialias,
-      powerPreference: RENDER.powerPreference
+      antialias: !this.isTouch,
+      powerPreference: 'high-performance'
     });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, RENDER.pixelRatioCap));
+    this.renderer.setPixelRatio(
+      Math.min(window.devicePixelRatio || 1, this.perfTier.pixelRatioCap)
+    );
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type =
+      this.perfTier.shadowType === 'basic' ? THREE.BasicShadowMap : THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = RENDER.toneMappingExposure;
+    this.renderer.toneMappingExposure = 1.05;
 
-    // Scene
+    // ----- Scene -----
     this.scene = new THREE.Scene();
 
-    // Camera
+    // ----- Camera -----
     this.camera = new THREE.PerspectiveCamera(
       CAMERA.fov,
       window.innerWidth / window.innerHeight,
@@ -84,65 +76,135 @@ export class Game {
     this.camera.position.set(0, 6, 12);
     this.camera.lookAt(0, 0, 0);
 
-    // Effects needs camera + renderer
+    // ----- Effects -----
     this.effects = new Effects(this.scene, this.camera, this.renderer);
 
-    // World
-    this.world = new World(this.scene);
-
-    // Car
-    this.car = new Car(this.scene, 0);
+    // ----- World + Car -----
+    this.currentLevelId = 1;
+    this.level = getLevelById(this.currentLevelId);
+    this.world = new World(this.scene, this.level.theme);
+    this.car = new Car(this.scene, Storage.getSelectedSkinId());
     this.car.reset(0, 0, 0);
 
-    // State
+    // ----- Run state -----
     this.state = STATE.MENU;
     this.stateTime = 0;
-    this.lastTime = performance.now();
-    this.accumulator = 0;
-
-    // Input
-    this.keys = {};
-    this.touch = { left: false, right: false, gas: false, brake: false, turbo: false };
-    this._bindInput();
-
-    // Menu / gameplay variables
-    this.menuOrbitAngle = 0;
     this.lives = CAR.lives;
-    this.timer = CAR.tiempoMax;
+    this.timer = this.level.timeLimit;
     this.score = 0;
     this.coins = 0;
     this.crowns = 0;
     this.distance = 0;
-    this.prevPlayerZ = 0;
-    this.startZ = 0;
     this.combo = 0;
     this.lastPassTime = -999;
     this.invulnTime = 0;
     this.hitFlashTime = 0;
     this.timeWasLow = false;
+    this.prevPlayerZ = 0;
+    this.startZ = 0;
+    this.prize = null;
 
-    // Camera smoothing state
+    this._display = { coins: 0, crowns: 0, score: 0 };
+
+    // Camera smoothing
     this.camPos = new THREE.Vector3(0, CAMERA.offsetUp, CAMERA.offsetBack);
     this.camLookAt = new THREE.Vector3(0, CAMERA.lookUp, 0);
     this.camFov = CAMERA.fov;
-    this.camShakeOffset = new THREE.Vector3();
-
-    // Checkpoint tween
     this.cpTween = null;
+    this.menuOrbitAngle = 0;
 
-    // Displayed HUD values (for tween sync)
-    this._display = { coins: 0, crowns: 0, score: 0 };
+    // Boost sparkle timing
+    this._boostSparkleTimer = 0;
+    this._boostPulseActive = false;
 
-    // Handle resize
+    // Input
+    this.keys = {};
+    this.touch = { left: false, right: false, gas: false, brake: false, turbo: false };
+
+    document.body.classList.toggle('is-touch', this.isTouch);
+
+    // ----- HUD refs -----
+    this.hud = {
+      root: el('hud'),
+      coins: el('hud-coins'),
+      crowns: el('hud-crowns'),
+      score: el('hud-score'),
+      speed: el('hud-speed'),
+      time: el('hud-time'),
+      lives: el('hud-lives'),
+      turbo: el('hud-turbo-fill'),
+      distance: el('hud-distance'),
+      levelName: el('hud-level-name'),
+      levelNum: el('hud-level-num'),
+      timePill: el('hud-time-pill')
+    };
+
+    // ----- Overlays -----
+    this.overlays = {
+      menu: el('menu-overlay'),
+      levelSelect: el('level-select-overlay'),
+      levelSelectGrid: el('level-select-grid'),
+      levelSelectClose: el('level-select-close'),
+      shop: el('shop-overlay'),
+      shopContainer: el('shop-container'),
+      gameOver: el('game-over-overlay'),
+      finalScore: el('final-score'),
+      restartButton: el('restart-button'),
+      menuButton: el('menu-button'),
+      win: el('win-overlay'),
+      winScore: el('win-score'),
+      winMenuButton: el('win-menu-button'),
+      prize: el('prize-overlay'),
+      prizeCoins: el('prize-coins'),
+      prizeCrowns: el('prize-crowns'),
+      prizeDistance: el('prize-distance'),
+      prizeTime: el('prize-time'),
+      prizeTotal: el('prize-total'),
+      prizeClaim: el('prize-claim-btn'),
+      goBtn: el('go-button'),
+      shopBtn: el('shop-button'),
+      helpBtn: el('help-button'),
+      settingsBtn: el('settings-button'),
+      helpPanel: el('help-panel'),
+      settingsPanel: el('settings-panel'),
+      menuCoins: el('menu-wallet-coins'),
+      menuCrowns: el('menu-wallet-crowns'),
+      levelCompleteBanner: el('level-complete-banner')
+    };
+
+    // ----- Shop -----
+    this.shop = new Shop({
+      container: this.overlays.shopContainer,
+      onSelectSkin: (id) => {
+        this.car.setSkin(id);
+        this._refreshWallet();
+      },
+      onClose: () => this._closeShop(),
+      onWalletChange: () => this._refreshWallet()
+    });
+
+    // Bind input after overlays and shop refs exist
+    this._bindInput();
+
+    // ----- Initial UI -----
+    this.world.showMenuPlatform(true);
+    this.effects.overlayFade(this.overlays.menu, true);
+    this.effects.overlayFade(this.overlays.levelSelect, false);
+    this.effects.overlayFade(this.overlays.gameOver, false);
+    this.effects.overlayFade(this.overlays.prize, false);
+    this.effects.overlayFade(this.overlays.win, false);
+    this.effects.overlayFade(this.overlays.shop, false);
+    this._applyMenuCamera();
+    this.effects.startMenuBounce(this.car.group);
+    this._refreshWallet();
+    this._refreshLevelHud();
+
+    // Resize
     window.addEventListener('resize', () => this._onResize());
     this._onResize();
 
-    // Start in menu
-    this.world.showMenuPlatform(true);
-    this._applyMenuCamera();
-    this.effects.startMenuBounce(this.car.group);
-
-    // Kick off loop
+    // ----- Loop -----
+    this.lastTime = performance.now();
     requestAnimationFrame((t) => this._loop(t));
   }
 
@@ -152,25 +214,15 @@ export class Game {
   _bindInput() {
     window.addEventListener('keydown', (e) => {
       const code = e.code;
-      if (
-        INPUT.gas.includes(code) ||
-        INPUT.brake.includes(code) ||
-        INPUT.steerLeft.includes(code) ||
-        INPUT.steerRight.includes(code) ||
-        INPUT.turbo.includes(code) ||
-        INPUT.start.includes(code) ||
-        INPUT.restart.includes(code) ||
-        INPUT.cycleColor.includes(code)
-      ) {
-        e.preventDefault();
-      }
+      const preventCodes = [
+        ...INPUT.gas, ...INPUT.brake, ...INPUT.steerLeft, ...INPUT.steerRight,
+        ...INPUT.turbo, ...INPUT.start, ...INPUT.restart
+      ];
+      if (preventCodes.includes(code)) e.preventDefault();
       this.keys[code] = true;
 
       if (INPUT.start.includes(code)) this._onStartInput();
       if (INPUT.restart.includes(code)) this._onRestartInput();
-      if (INPUT.cycleColor.includes(code) && this.state === STATE.MENU) {
-        this.car.cycleColor();
-      }
     });
 
     window.addEventListener('keyup', (e) => {
@@ -179,27 +231,26 @@ export class Game {
 
     window.addEventListener('blur', () => {
       this.keys = {};
+      this.touch = { left: false, right: false, gas: false, brake: false, turbo: false };
     });
 
     // Menu buttons
     if (this.overlays.goBtn) {
       this.overlays.goBtn.addEventListener('click', () => this._onStartInput());
     }
-    if (this.overlays.restartBtn) {
-      this.overlays.restartBtn.addEventListener('click', () => this._onRestartInput());
+    if (this.overlays.shopBtn) {
+      this.overlays.shopBtn.addEventListener('click', () => this._openShop());
     }
-    if (this.overlays.winRestartBtn) {
-      this.overlays.winRestartBtn.addEventListener('click', () => this._onRestartInput());
-    }
-
-    // Help / settings panels
     if (this.overlays.helpBtn) {
-      this.overlays.helpBtn.addEventListener('click', () => this._togglePanel(this.overlays.helpPanel));
+      this.overlays.helpBtn.addEventListener('click', () =>
+        this._togglePanel(this.overlays.helpPanel)
+      );
     }
     if (this.overlays.settingsBtn) {
-      this.overlays.settingsBtn.addEventListener('click', () => this._togglePanel(this.overlays.settingsPanel));
+      this.overlays.settingsBtn.addEventListener('click', () =>
+        this._togglePanel(this.overlays.settingsPanel)
+      );
     }
-    // Close panels on click-outside
     [this.overlays.helpPanel, this.overlays.settingsPanel].forEach((p) => {
       if (!p) return;
       p.addEventListener('click', (e) => {
@@ -207,7 +258,24 @@ export class Game {
       });
     });
 
-    // Touch controls
+    if (this.overlays.levelSelectClose) {
+      this.overlays.levelSelectClose.addEventListener('click', () => this._hideLevelSelect());
+    }
+
+    if (this.overlays.restartButton) {
+      this.overlays.restartButton.addEventListener('click', () => this._restartLevel());
+    }
+    if (this.overlays.menuButton) {
+      this.overlays.menuButton.addEventListener('click', () => this._backToMenu());
+    }
+    if (this.overlays.winMenuButton) {
+      this.overlays.winMenuButton.addEventListener('click', () => this._backToMenu());
+    }
+    if (this.overlays.prizeClaim) {
+      this.overlays.prizeClaim.addEventListener('click', () => this._claimPrize());
+    }
+
+    // Touch buttons
     this._bindTouchButton('touch-left', 'left');
     this._bindTouchButton('touch-right', 'right');
     this._bindTouchButton('touch-gas', 'gas');
@@ -216,30 +284,19 @@ export class Game {
   }
 
   _bindTouchButton(id, key) {
-    const el = document.getElementById(id);
-    if (!el) return;
+    const elBtn = el(id);
+    if (!elBtn) return;
     const set = (v) => (e) => {
-      e.preventDefault();
+      if (e && e.preventDefault) e.preventDefault();
       this.touch[key] = v;
-      el.classList.toggle('active', v);
+      elBtn.classList.toggle('active', v);
     };
-    el.addEventListener('touchstart', set(true), { passive: false });
-    el.addEventListener('touchend', set(false), { passive: false });
-    el.addEventListener('touchcancel', set(false), { passive: false });
-    el.addEventListener('mousedown', set(true));
-    el.addEventListener('mouseup', set(false));
-    el.addEventListener('mouseleave', set(false));
-  }
-
-  _togglePanel(panel) {
-    if (!panel) return;
-    if (panel.classList.contains('show')) this._hidePanel(panel);
-    else panel.classList.add('show');
-  }
-
-  _hidePanel(panel) {
-    if (!panel) return;
-    panel.classList.remove('show');
+    elBtn.addEventListener('touchstart', set(true), { passive: false });
+    elBtn.addEventListener('touchend', set(false), { passive: false });
+    elBtn.addEventListener('touchcancel', set(false), { passive: false });
+    elBtn.addEventListener('mousedown', set(true));
+    elBtn.addEventListener('mouseup', set(false));
+    elBtn.addEventListener('mouseleave', set(false));
   }
 
   _readInput() {
@@ -255,30 +312,134 @@ export class Game {
   }
 
   // ===========================================================================
-  // STATE TRANSITIONS
+  // PANELS
+  // ===========================================================================
+  _togglePanel(panel) {
+    if (!panel) return;
+    if (panel.classList.contains('show')) this._hidePanel(panel);
+    else panel.classList.add('show');
+  }
+
+  _hidePanel(panel) {
+    if (!panel) return;
+    panel.classList.remove('show');
+  }
+
+  // ===========================================================================
+  // MENU / LEVEL SELECT / SHOP
   // ===========================================================================
   _onStartInput() {
-    if (this.state === STATE.MENU) this._startGame();
+    if (this.state === STATE.MENU) {
+      this._showLevelSelect();
+    } else if (this.state === STATE.LEVEL_SELECT) {
+      // Enter picks the first unlocked un-completed level.
+      const level = this._pickRecommendedLevel();
+      this._startLevel(level.id);
+    }
   }
 
   _onRestartInput() {
     if (this.state === STATE.GAME_OVER || this.state === STATE.WIN) {
-      this._startGame();
+      this._restartLevel();
+    } else if (this.state === STATE.PRIZE) {
+      this._claimPrize();
     }
   }
 
-  _setState(s) {
-    this.state = s;
-    this.stateTime = 0;
+  _pickRecommendedLevel() {
+    const unlocked = Storage.getUnlockedLevel();
+    const completed = Storage.getLevelsCompleted();
+    for (const lv of LEVELS) {
+      if (lv.id <= unlocked && !completed.includes(lv.id)) return lv;
+    }
+    return getLevelById(Math.min(unlocked, LEVELS.length));
+  }
+
+  _showLevelSelect() {
+    this._setState(STATE.LEVEL_SELECT);
+    this.effects.stopMenuBounce();
+    this._buildLevelSelectGrid();
+    this.effects.overlayFade(this.overlays.levelSelect, true);
+  }
+
+  _hideLevelSelect() {
+    this.effects.overlayFade(this.overlays.levelSelect, false);
+    this._setState(STATE.MENU);
+    this.effects.startMenuBounce(this.car.group);
+  }
+
+  _buildLevelSelectGrid() {
+    const grid = this.overlays.levelSelectGrid;
+    if (!grid) return;
+    grid.innerHTML = '';
+    const unlocked = Storage.getUnlockedLevel();
+    const completed = Storage.getLevelsCompleted();
+
+    for (const lv of LEVELS) {
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'level-card';
+      const isLocked = lv.id > unlocked;
+      const isCompleted = completed.includes(lv.id);
+      card.classList.toggle('locked', isLocked);
+      card.classList.toggle('completed', isCompleted);
+      card.innerHTML = `
+        <div class="level-card-num">${lv.id}</div>
+        <div class="level-card-name">${lv.name}</div>
+        <div class="level-card-info">${lv.targetDistance}m · ${lv.timeLimit}s</div>
+        ${isLocked ? '<div class="level-card-lock">LOCKED</div>' : ''}
+        ${isCompleted ? '<div class="level-card-check">&#10003;</div>' : ''}
+      `;
+      if (!isLocked) {
+        card.addEventListener('click', () => {
+          this._hideLevelSelect();
+          this._startLevel(lv.id);
+        });
+      }
+      grid.appendChild(card);
+    }
+  }
+
+  _openShop() {
+    if (this.state !== STATE.MENU) return;
+    this.effects.stopMenuBounce();
+    this._setState(STATE.SHOP);
+    this.shop.show();
+    this.effects.overlayFade(this.overlays.shop, true);
+  }
+
+  _closeShop() {
+    this.effects.overlayFade(this.overlays.shop, false);
+    this._setState(STATE.MENU);
+    this.effects.startMenuBounce(this.car.group);
+    this._refreshWallet();
+  }
+
+  _refreshWallet() {
+    const wallet = Storage.getWallet();
+    if (this.overlays.menuCoins) this.overlays.menuCoins.textContent = wallet.coins.toLocaleString();
+    if (this.overlays.menuCrowns) this.overlays.menuCrowns.textContent = wallet.crowns.toLocaleString();
   }
 
   // ===========================================================================
-  // GAME START / RESTART / END
+  // LEVELS
   // ===========================================================================
-  _startGame() {
-    // Reset player state
+  _refreshLevelHud() {
+    if (this.hud.levelName) this.hud.levelName.textContent = this.level.name;
+    if (this.hud.levelNum) this.hud.levelNum.textContent = String(this.level.id);
+  }
+
+  _startLevel(levelId) {
+    this.currentLevelId = levelId;
+    this.level = getLevelById(levelId);
+
+    // Apply level theme.
+    this.world.applyTheme(this.level.theme);
+    this.world.setTrafficDensity(this.level.trafficDensity / 1.0);
+
+    // Reset player / car.
     this.lives = CAR.lives;
-    this.timer = CAR.tiempoMax;
+    this.timer = this.level.timeLimit;
     this.score = 0;
     this.coins = 0;
     this.crowns = 0;
@@ -289,48 +450,51 @@ export class Game {
     this.hitFlashTime = 0;
     this.timeWasLow = false;
     this._display = { coins: 0, crowns: 0, score: 0 };
+    this.prize = null;
 
-    // Reset car
     this.car.reset(0, 0, 0);
-    this.startZ = this.car.group.position.z;
-    this.prevPlayerZ = this.car.group.position.z;
+    this.car.setSkin(Storage.getSelectedSkinId());
+    this.prevPlayerZ = 0;
+    this.startZ = 0;
 
-    // Reset world
+    // Reset world for play.
     this.world.showMenuPlatform(false);
-    this.world.resetForPlay(this.car.group.position.z);
+    this.world.resetForPlay(0);
 
-    // Stop menu bounce, turbo pulse
+    // Effects cleanup.
     this.effects.stopMenuBounce();
-    this.effects.stopTurboPulse();
+    this.effects.stopBoostPulse();
 
-    // Hide overlays
+    // Hide overlays.
     this.effects.overlayFade(this.overlays.menu, false);
+    this.effects.overlayFade(this.overlays.levelSelect, false);
     this.effects.overlayFade(this.overlays.gameOver, false);
     this.effects.overlayFade(this.overlays.win, false);
+    this.effects.overlayFade(this.overlays.prize, false);
+    this.effects.overlayFade(this.overlays.shop, false);
     this._hidePanel(this.overlays.helpPanel);
     this._hidePanel(this.overlays.settingsPanel);
 
-    // Show HUD
+    // HUD.
     if (this.hud.root) this.hud.root.classList.add('playing');
     document.body.classList.add('playing');
-
-    // Reset HUD values
     this._setHudText(this.hud.coins, '0');
     this._setHudText(this.hud.crowns, '0');
     this._setHudText(this.hud.score, '0');
     this._setHudText(this.hud.time, Math.ceil(this.timer));
     this._setHudText(this.hud.distance, '0m');
     this._renderLives();
-    this._setTurboFill(this.car.turboAmount / CAR.turboMax);
+    this._setBoostFill(this.car.boostAmount / BOOST.max);
+    this._refreshLevelHud();
+    if (this.hud.timePill) this.hud.timePill.classList.remove('warn');
 
-    // Reset camera behind car
+    // Camera reset.
     this.camPos.set(0, CAMERA.offsetUp, CAMERA.offsetBack);
     this.camLookAt.set(0, CAMERA.lookUp, 0);
     this.camFov = CAMERA.fov;
     this.camera.fov = CAMERA.fov;
     this.camera.updateProjectionMatrix();
 
-    // Cancel any checkpoint tween
     if (this.cpTween) {
       this.cpTween.pause();
       this.cpTween = null;
@@ -339,27 +503,99 @@ export class Game {
     this._setState(STATE.PLAY);
   }
 
-  _endGame(didWin) {
+  _restartLevel() {
+    this._startLevel(this.currentLevelId);
+  }
+
+  _onLevelComplete() {
     if (this.state !== STATE.PLAY && this.state !== STATE.CHECKPOINT) return;
+    this._setState(STATE.LEVEL_COMPLETE);
 
-    this._setState(didWin ? STATE.WIN : STATE.GAME_OVER);
+    // Freeze motion.
+    this.car.speed = 0;
 
-    // Stop gameplay effects
-    this.effects.stopTurboPulse();
+    this.effects.stopBoostPulse();
+    this.effects.levelCompleteFlash('LEVEL COMPLETE!');
 
-    // Pause; show relevant overlay
-    if (didWin) {
+    // Compute prize.
+    const baseCoins = this.coins;
+    const baseCrowns = this.crowns;
+    const distanceBonus = Math.round(this.level.targetDistance * 1.5 * this.level.coinRate);
+    const timeBonus = Math.round(Math.max(0, this.timer) * 8 * this.level.coinRate);
+    const total = baseCoins + distanceBonus + timeBonus;
+
+    this.prize = {
+      coins: baseCoins,
+      crowns: baseCrowns,
+      distanceBonus,
+      timeBonus,
+      total,
+      score: Math.round(this.score),
+      nextLevelId: this.level.id < LEVELS.length ? this.level.id + 1 : null
+    };
+
+    // Brief pause, then open prize overlay.
+    setTimeout(() => {
+      if (this.state === STATE.LEVEL_COMPLETE) this._showPrize();
+    }, 900);
+  }
+
+  _showPrize() {
+    this._setState(STATE.PRIZE);
+    const p = this.prize;
+    if (!p) return;
+
+    if (this.overlays.prizeCoins) this.overlays.prizeCoins.textContent = p.coins.toLocaleString();
+    if (this.overlays.prizeCrowns) this.overlays.prizeCrowns.textContent = p.crowns.toLocaleString();
+    if (this.overlays.prizeDistance) this.overlays.prizeDistance.textContent = '+' + p.distanceBonus.toLocaleString();
+    if (this.overlays.prizeTime) this.overlays.prizeTime.textContent = '+' + p.timeBonus.toLocaleString();
+    if (this.overlays.prizeTotal) this.overlays.prizeTotal.textContent = p.total.toLocaleString();
+
+    this.effects.overlayFade(this.overlays.prize, true);
+  }
+
+  _claimPrize() {
+    if (!this.prize) return;
+    const p = this.prize;
+
+    // Pay out.
+    Storage.addCoins(p.total);
+    Storage.addCrowns(p.crowns);
+    Storage.submitHighScore(p.score);
+    Storage.markLevelCompleted(this.level.id);
+
+    // Reset prize so double-click doesn't double-pay.
+    this.prize = null;
+
+    this.effects.overlayFade(this.overlays.prize, false);
+    this._refreshWallet();
+
+    if (p.nextLevelId) {
+      // Start next level after a short delay for the fade.
+      setTimeout(() => this._startLevel(p.nextLevelId), 260);
+    } else {
+      // Last level — victory.
+      this._setState(STATE.WIN);
       if (this.overlays.winScore) {
-        this.overlays.winScore.textContent = Math.round(this.score).toLocaleString();
+        this.overlays.winScore.textContent = Storage.getHighScore().toLocaleString();
       }
       this.effects.overlayFade(this.overlays.win, true);
-    } else {
-      if (this.overlays.finalScore) {
-        this.overlays.finalScore.textContent = Math.round(this.score).toLocaleString();
-      }
-      this.effects.overlayFade(this.overlays.gameOver, true);
+      if (this.hud.root) this.hud.root.classList.remove('playing');
+      document.body.classList.remove('playing');
     }
+  }
 
+  _onGameOver() {
+    if (this.state === STATE.GAME_OVER) return;
+    this._setState(STATE.GAME_OVER);
+    this.effects.stopBoostPulse();
+
+    if (this.overlays.finalScore) {
+      this.overlays.finalScore.textContent = Math.round(this.score).toLocaleString();
+    }
+    Storage.submitHighScore(Math.round(this.score));
+
+    this.effects.overlayFade(this.overlays.gameOver, true);
     if (this.hud.root) this.hud.root.classList.remove('playing');
     document.body.classList.remove('playing');
   }
@@ -367,52 +603,64 @@ export class Game {
   _backToMenu() {
     this._setState(STATE.MENU);
     this.car.reset(0, 0, 0);
+    this.car.setSkin(Storage.getSelectedSkinId());
     this.world.showMenuPlatform(true);
+    this.world.applyTheme('beach');
+
     this.effects.overlayFade(this.overlays.gameOver, false);
     this.effects.overlayFade(this.overlays.win, false);
+    this.effects.overlayFade(this.overlays.prize, false);
+    this.effects.overlayFade(this.overlays.levelSelect, false);
+    this.effects.overlayFade(this.overlays.shop, false);
     this.effects.overlayFade(this.overlays.menu, true);
     this.effects.startMenuBounce(this.car.group);
+
     if (this.hud.root) this.hud.root.classList.remove('playing');
     document.body.classList.remove('playing');
+    this._refreshWallet();
+  }
+
+  _setState(s) {
+    this.state = s;
+    this.stateTime = 0;
   }
 
   // ===========================================================================
   // HUD HELPERS
   // ===========================================================================
-  _setHudText(el, value) {
-    if (el) el.textContent = value;
+  _setHudText(elRef, value) {
+    if (elRef) elRef.textContent = value;
   }
 
   _renderLives() {
     if (!this.hud.lives) return;
-    const total = CAR.lives;
     let html = '';
-    for (let i = 0; i < total; i++) {
+    for (let i = 0; i < CAR.lives; i++) {
       html += `<span class="life ${i < this.lives ? 'alive' : 'dead'}">&#10084;</span>`;
     }
     this.hud.lives.innerHTML = html;
   }
 
-  _setTurboFill(frac) {
+  _setBoostFill(frac) {
     if (!this.hud.turbo) return;
     const pct = clamp(frac, 0, 1) * 100;
     this.hud.turbo.style.width = `${pct.toFixed(1)}%`;
-    this.hud.turbo.parentElement.classList.toggle('low', frac < 0.2);
-    this.hud.turbo.parentElement.classList.toggle('ready', frac >= 0.5);
+    const parent = this.hud.turbo.parentElement;
+    if (!parent) return;
+    parent.classList.toggle('low', frac < 0.2);
+    parent.classList.toggle('ready', frac >= 0.5);
   }
 
   _flashHudHit() {
     if (!this.hud.root) return;
-    const el = this.hud.root;
-    el.classList.add('hit');
-    setTimeout(() => el.classList.remove('hit'), 260);
+    this.hud.root.classList.add('hit');
+    setTimeout(() => this.hud.root.classList.remove('hit'), 260);
   }
 
   // ===========================================================================
   // CAMERA
   // ===========================================================================
   _applyMenuCamera() {
-    // Slow orbit around the car on the menu platform.
     const r = CAMERA.menuOrbitRadius;
     const h = CAMERA.menuOrbitHeight;
     this.camera.position.set(
@@ -426,7 +674,6 @@ export class Game {
   _updateMenuCamera(dt) {
     this.menuOrbitAngle += dt * CAMERA.menuOrbitSpeed;
     this._applyMenuCamera();
-    // Gentle FOV settle
     if (Math.abs(this.camera.fov - CAMERA.fov) > 0.05) {
       this.camera.fov = lerp(this.camera.fov, CAMERA.fov, Math.min(1, dt * 4));
       this.camera.updateProjectionMatrix();
@@ -434,24 +681,22 @@ export class Game {
   }
 
   _updateChaseCamera(dt) {
+    if (this.cpTween) return;
+
     const pos = this.car.group.position;
     const heading = this.car.heading;
 
-    // Desired camera position (behind car).
-    // Forward is (-sin h, 0, -cos h); behind is +offsetBack along -forward = (sin h, 0, cos h).
     const backX = Math.sin(heading) * CAMERA.offsetBack;
     const backZ = Math.cos(heading) * CAMERA.offsetBack;
     const targetX = pos.x + backX;
     const targetZ = pos.z + backZ;
     const targetY = pos.y + CAMERA.offsetUp;
 
-    // Smooth follow (lerp).
     const kPos = 1 - Math.exp(-CAMERA.followLerp * dt);
     this.camPos.x += (targetX - this.camPos.x) * kPos;
     this.camPos.y += (targetY - this.camPos.y) * kPos;
     this.camPos.z += (targetZ - this.camPos.z) * kPos;
 
-    // Desired look-at (ahead of car).
     const fwdX = -Math.sin(heading) * CAMERA.lookAhead;
     const fwdZ = -Math.cos(heading) * CAMERA.lookAhead;
     const lookX = pos.x + fwdX;
@@ -463,20 +708,13 @@ export class Game {
     this.camLookAt.y += (lookY - this.camLookAt.y) * kLook;
     this.camLookAt.z += (lookZ - this.camLookAt.z) * kLook;
 
-    // Checkpoint tween overrides (if active) — handled separately.
-    if (this.cpTween) {
-      return;
-    }
-
-    // FOV boost on turbo.
-    const targetFov = this.car.turboActive ? CAMERA.fovTurboBoost : CAMERA.fov;
-    this.camFov = lerp(this.camFov, targetFov, Math.min(1, dt * CAMERA.fovLerp));
+    const targetFov = this.car.boostActive ? BOOST.fovBoost : CAMERA.fov;
+    this.camFov = lerp(this.camFov, targetFov, Math.min(1, dt * BOOST.fovLerp));
     if (Math.abs(this.camera.fov - this.camFov) > 0.02) {
       this.camera.fov = this.camFov;
       this.camera.updateProjectionMatrix();
     }
 
-    // Apply position + shake.
     this.effects.updateShake(dt);
     const shake = this.effects.getShakeOffset();
     this.camera.position.set(
@@ -492,128 +730,149 @@ export class Game {
 
     const pos = this.car.group.position;
     const heading = this.car.heading;
-    const start = {
-      x: this.camPos.x,
-      y: this.camPos.y,
-      z: this.camPos.z
-    };
+    const start = { x: this.camPos.x, y: this.camPos.y, z: this.camPos.z };
     const end = {
       x: pos.x + Math.sin(heading) * CAMERA.checkpointTweenBack,
       y: pos.y + CAMERA.checkpointTweenUp,
       z: pos.z + Math.cos(heading) * CAMERA.checkpointTweenBack
     };
 
-    const state = { t: 0 };
-
+    const stateT = { t: 0 };
     this.cpTween = anime({
-      targets: state,
+      targets: stateT,
       t: [0, 1],
       duration: CAMERA.checkpointTweenDur * 1000,
       easing: 'easeInOutQuad',
       update: () => {
-        const t = state.t;
-        const cx = lerp(start.x, end.x, t);
-        const cy = lerp(start.y, end.y, t);
-        const cz = lerp(start.z, end.z, t);
-        this.camera.position.set(cx, cy, cz);
+        const t = stateT.t;
+        this.camera.position.set(
+          lerp(start.x, end.x, t),
+          lerp(start.y, end.y, t),
+          lerp(start.z, end.z, t)
+        );
         this.camera.lookAt(pos.x, pos.y + CAMERA.lookUp, pos.z);
       },
       complete: () => {
         this.camPos.set(end.x, end.y, end.z);
         this.camLookAt.set(pos.x, pos.y + CAMERA.lookUp, pos.z);
         this.cpTween = null;
-        if (this.state === STATE.CHECKPOINT) {
-          this._setState(STATE.PLAY);
-        }
+        if (this.state === STATE.CHECKPOINT) this._setState(STATE.PLAY);
       }
     });
   }
+
   // ===========================================================================
-  // GAMEPLAY UPDATE
+  // GAMEPLAY
   // ===========================================================================
   _updateGameplay(dt, input) {
-    // Car update
-    this.car.update(dt, input, this.state === STATE.PLAY || this.state === STATE.CHECKPOINT);
+    const allowControl = this.state === STATE.PLAY || this.state === STATE.CHECKPOINT;
+    this.car.update(dt, input, allowControl);
 
-    // Track distance
     const pos = this.car.group.position;
-    const dz = this.prevPlayerZ - pos.z; // positive when moving forward (-Z)
+    const dz = this.prevPlayerZ - pos.z;
     if (dz > 0) this.distance += dz;
     this.prevPlayerZ = pos.z;
 
-    // Passive distance score
-    this.score += dz * SCORE.perMeter;
+    this.score += Math.max(0, dz) * SCORE.perMeter;
 
-    // Invuln timer
     if (this.invulnTime > 0) {
       this.invulnTime -= dt;
-      // Blink car
-      const blink = (Math.sin(this.invulnTime * 30) > 0);
+      const blink = Math.sin(this.invulnTime * 30) > 0;
       this.car.group.visible = blink;
     } else {
       this.car.group.visible = true;
     }
     if (this.hitFlashTime > 0) this.hitFlashTime -= dt;
 
-    // Timer countdown
     if (this.state === STATE.PLAY) {
       this.timer -= dt;
       if (this.timer <= 0) {
         this.timer = 0;
-        this._endGame(false);
+        this._onGameOver();
         return;
       }
-      // Low-time warning
       const low = this.timer <= 10;
       if (low !== this.timeWasLow) {
         this.timeWasLow = low;
-        if (this.hud.time) this.hud.time.parentElement.classList.toggle('warn', low);
+        if (this.hud.timePill) this.hud.timePill.classList.toggle('warn', low);
       }
     }
 
-    // World update
     this.world.update(dt, pos.z, pos.x);
 
-    // Pickup collection
+    // Pickups
     const collected = this.world.collectNearby(pos, 1.6);
     for (const item of collected) {
       if (item.type === 'coin') this._onCoin(item.position);
       else if (item.type === 'crown') this._onCrown(item.position);
-      else if (item.type === 'turbo') this._onTurboPickup(item.position);
+      else if (item.type === 'boost') this._onBoostPickup(item.position);
     }
 
-    // Checkpoint crossing
+    // Checkpoints
     const crossed = this.world.checkCheckpointCrossing(this.prevPlayerZ + dz, pos.z);
     if (crossed.length > 0) this._onCheckpoint(crossed[0]);
 
-    // Traffic collision
+    // Traffic
     if (this.invulnTime <= 0) {
       const hit = this.world.detectTrafficCollision(pos, this.car.getBoundingRadius());
       if (hit) this._onCollision();
     }
 
-    // Turbo glow pulse start/stop
-    if (this.car.turboActive) {
-      this.effects.startTurboPulse(this.car);
-    } else {
-      this.effects.stopTurboPulse();
+    // Traffic pass detection + scoring
+    for (let i = 0; i < this.world.traffic.length; i++) {
+      const t = this.world.traffic[i];
+      if (t.userData.passedByPlayer && !t.userData.scored) {
+        t.userData.scored = true;
+        this._onTrafficPassed(t);
+      }
+      if (!t.userData.passedByPlayer) t.userData.scored = false;
     }
 
-    // Effects update
+    // Boost visuals
+    if (this.car.boostActive) {
+      if (!this._boostPulseActive) {
+        this._boostPulseActive = true;
+        this.effects.startBoostPulse(this.car);
+      }
+      this._spawnBoostSparklesIfActive(dt);
+    } else if (this._boostPulseActive) {
+      this._boostPulseActive = false;
+      this.effects.stopBoostPulse();
+    }
+
+    // Effects
     const speedFactor = clamp(Math.abs(this.car.speed) / CAR.maxSpeed, 0, 1);
     this.effects.update(dt, this.car, speedFactor);
 
-    // HUD updates
+    // Level completion check
+    if (this.distance >= this.level.targetDistance && this.state === STATE.PLAY) {
+      this._onLevelComplete();
+      return;
+    }
+
     this._updateHud();
   }
 
-  // ===========================================================================
-  // COLLECT / HIT HANDLERS
-  // ===========================================================================
+  _spawnBoostSparklesIfActive(dt) {
+    this._boostSparkleTimer += dt;
+    const interval = 1 / BOOST.flameRate;
+    while (this._boostSparkleTimer >= interval) {
+      this._boostSparkleTimer -= interval;
+      const pos = this.car.group.position;
+      const h = this.car.heading;
+      const fx = -Math.sin(h);
+      const fz = -Math.cos(h);
+      const px = pos.x - fx * 2.4;
+      const pz = pos.z - fz * 2.4;
+      const world = new THREE.Vector3(px, 0.75, pz);
+      this.effects.spawnBoostSparkles(world);
+    }
+  }
+
   _onCoin(worldPos) {
     this.coins += 1;
     this.score += SCORE.coin;
-    this.car.addTurbo(CAR.turboRegenCoin);
+    this.car.addBoost(BOOST.coinRegen);
     this.effects.coinPop(worldPos);
     this.effects.tweenCounter(this.hud.coins, this._display.coins, this.coins);
     this._display.coins = this.coins;
@@ -622,23 +881,24 @@ export class Game {
   _onCrown(worldPos) {
     this.crowns += 1;
     this.score += SCORE.crown;
-    this.car.addTurbo(CAR.turboRegenCrown);
+    this.car.addBoost(BOOST.crownRegen);
     this.effects.crownPop(worldPos);
     this.effects.tweenCounter(this.hud.crowns, this._display.crowns, this.crowns);
     this._display.crowns = this.crowns;
   }
 
-  _onTurboPickup(worldPos) {
-    this.car.addTurbo(CAR.turboMax * 0.5);
-    this.effects.turboPop(worldPos);
+  _onBoostPickup(worldPos) {
+    this.car.addBoost(BOOST.pickupRegen);
+    this.effects.boostPop(worldPos);
   }
 
   _onCheckpoint(cp) {
-    // Extend timer, add score, pulse gate, camera tween.
-    this.timer = Math.min(CAR.tiempoMax + 30, this.timer + CAR.checkpointTimeBonus);
+    this.timer = Math.min(this.level.timeLimit + 30, this.timer + 8);
     this.score += SCORE.checkpoint;
     this.effects.pulseCheckpoint(cp);
-    this.effects.checkpointPop(cp.position.clone().setY(3));
+    const cpPos = cp.position.clone();
+    cpPos.y = 3;
+    this.effects.checkpointPop(cpPos);
     this._setState(STATE.CHECKPOINT);
     this._playCheckpointCameraTween();
   }
@@ -648,23 +908,16 @@ export class Game {
     this.car.onCollision();
     this.invulnTime = CAR.collisionInvulnTime;
     this.hitFlashTime = CAR.collisionInvulnTime;
+    this.combo = 0;
 
-    // Effects: burst, shake, flash HUD
     const pos = this.car.group.position.clone();
     pos.y += 0.8;
     this.effects.spawnCollisionBurst(pos, 0xffa033);
     this.effects.triggerShake(CAR.collisionShakeAmp, CAR.collisionShakeDur);
     this._flashHudHit();
-
-    // Combo reset
-    this.combo = 0;
-
-    // Update lives HUD
     this._renderLives();
 
-    if (this.lives <= 0) {
-      this._endGame(false);
-    }
+    if (this.lives <= 0) this._onGameOver();
   }
 
   _onTrafficPassed(carGroup) {
@@ -679,84 +932,54 @@ export class Game {
     const comboMult = 1 + (this.combo - 1) * 0.15;
     const gain = Math.round(SCORE.passTraffic * comboMult);
     this.score += gain;
-    this.car.addTurbo(CAR.turboRegenPass);
+    this.car.addBoost(BOOST.passRegen);
 
     const p = carGroup.position.clone();
     p.y += 1.2;
     this.effects.passPop(p);
   }
 
-  // ===========================================================================
-  // HUD REFRESH
-  // ===========================================================================
   _updateHud() {
-    // Time
-    if (this.hud.time) {
-      this.hud.time.textContent = Math.ceil(this.timer);
-    }
+    if (this.hud.time) this.hud.time.textContent = Math.ceil(this.timer);
+    if (this.hud.speed) this.hud.speed.textContent = Math.round(Math.abs(this.car.speed) * 3.6);
 
-    // Speed (in "km/h" display only)
-    if (this.hud.speed) {
-      const kmh = Math.round(Math.abs(this.car.speed) * 3.6);
-      this.hud.speed.textContent = kmh;
-    }
-
-    // Score (only tween when value changes)
     const scoreInt = Math.round(this.score);
     if (scoreInt !== this._display.score) {
       this.effects.tweenCounter(this.hud.score, this._display.score, scoreInt, 180);
       this._display.score = scoreInt;
     }
 
-    // Distance
-    if (this.hud.distance) {
-      this.hud.distance.textContent = `${Math.floor(this.distance)}m`;
-    }
-
-    // Turbo fill
-    this._setTurboFill(this.car.turboAmount / CAR.turboMax);
-
-    // Win check
-    if (this.distance >= WIN_DISTANCE && this.state === STATE.PLAY) {
-      this._endGame(true);
-    }
+    if (this.hud.distance) this.hud.distance.textContent = `${Math.floor(this.distance)}m`;
+    this._setBoostFill(this.car.boostAmount / BOOST.max);
   }
 
   // ===========================================================================
-  // MAIN LOOP
+  // LOOP
   // ===========================================================================
   _loop(now) {
     requestAnimationFrame((t) => this._loop(t));
 
     const dtRaw = (now - this.lastTime) / 1000;
     this.lastTime = now;
-    const dt = Math.min(dtRaw, 0.05); // clamp huge frames
-
+    const dt = Math.min(dtRaw, 0.05);
     this.stateTime += dt;
 
     const input = this._readInput();
 
-    if (this.state === STATE.MENU) {
+    if (this.state === STATE.MENU || this.state === STATE.LEVEL_SELECT || this.state === STATE.SHOP) {
       this._updateMenuCamera(dt);
       this.car.update(dt, { left: false, right: false, gas: false, brake: false, turbo: false }, false);
       this.world.update(dt, this.car.group.position.z, this.car.group.position.x);
-      // Menu doesn't update traffic collisions/pickups visibly but keeps anim.
       this.effects.update(dt, this.car, 0);
     } else if (this.state === STATE.PLAY || this.state === STATE.CHECKPOINT) {
       this._updateGameplay(dt, input);
       this._updateChaseCamera(dt);
-
-      // Detect newly-passed traffic and award points.
-      for (let i = 0; i < this.world.traffic.length; i++) {
-        const t = this.world.traffic[i];
-        if (t.userData.passedByPlayer && !t.userData.scored) {
-          t.userData.scored = true;
-          this._onTrafficPassed(t);
-        }
-        if (!t.userData.passedByPlayer) t.userData.scored = false;
-      }
+    } else if (this.state === STATE.LEVEL_COMPLETE || this.state === STATE.PRIZE) {
+      this.car.update(dt, { left: false, right: false, gas: false, brake: false, turbo: false }, false);
+      this.world.update(dt, this.car.group.position.z, this.car.group.position.x);
+      this._updateChaseCamera(dt);
+      this.effects.update(dt, this.car, 0);
     } else if (this.state === STATE.GAME_OVER || this.state === STATE.WIN) {
-      // Slow drift / idle cam behind car, keep world updating gently.
       this.car.update(dt, { left: false, right: false, gas: false, brake: false, turbo: false }, false);
       this.world.update(dt, this.car.group.position.z, this.car.group.position.x);
       this._updateChaseCamera(dt);
@@ -773,7 +996,9 @@ export class Game {
     const w = window.innerWidth;
     const h = window.innerHeight;
     this.renderer.setSize(w, h, false);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, RENDER.pixelRatioCap));
+    this.renderer.setPixelRatio(
+      Math.min(window.devicePixelRatio || 1, this.perfTier.pixelRatioCap)
+    );
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
   }
@@ -786,6 +1011,7 @@ export class Game {
     this.effects.dispose();
     this.world.dispose();
     this.car.dispose();
+    this.shop.dispose();
     this.renderer.dispose();
   }
 }
@@ -793,18 +1019,23 @@ export class Game {
 // -----------------------------------------------------------------------------
 // BOOTSTRAP
 // -----------------------------------------------------------------------------
-window.addEventListener('DOMContentLoaded', () => {
-  // Guard: ensure renderer canvas exists.
-  const canvas = document.getElementById('game-canvas');
-  if (!canvas) {
-    console.error('[Meow Racing] Missing #game-canvas element.');
-    return;
+if (typeof window !== 'undefined') {
+  const boot = () => {
+    if (!document.getElementById('game-canvas')) {
+      console.error('[Meow Racing] Missing #game-canvas');
+      return;
+    }
+    try {
+      window.__MEOW_GAME__ = new Game();
+    } catch (err) {
+      console.error('[Meow Racing] Boot failed:', err);
+    }
+  };
+  if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
   }
-  try {
-    window.__MEOW_GAME__ = new Game();
-  } catch (err) {
-    console.error('[Meow Racing] Failed to boot:', err);
-  }
-});
+}
 
 export default Game;

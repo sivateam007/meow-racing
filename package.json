@@ -1,16 +1,15 @@
 {
   "name": "meow-racing",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
-  "description": "Meow Racing — a 3D browser racing game (Three.js + cannon-es + anime.js), clone of GameSnacks FullSpeed Racing gameplay with Meow Racing branding.",
+  "description": "Meow Racing - 3D browser racing game (Three.js + cannon-es + anime.js), Express Web Service",
   "type": "module",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js"
+    "start": "node server.js"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=18"
   },
   "dependencies": {
     "express": "^4.19.2"

@@ -1,12 +1,18 @@
 // js/effects.js
 // Meow Racing — anime.js-driven visual effects.
-// Manages: speed ribbons, collision particle bursts, camera shake, coin/crown
-// score popups, HUD counter tweens, checkpoint gate pulse, menu idle bounce,
-// turbo glow pulse, overlay fades.
+// Manages: speed ribbons, collision particle bursts, boost sparkles, camera
+// shake, score popups, HUD counter tweens, checkpoint gate pulses, menu idle
+// bounce, level-complete flashes. All tweens use anime.js so timing is uniform.
 
 import * as THREE from 'three';
 import anime from 'animejs';
-import { EFFECTS, UI, clamp, randRange } from './config.js';
+import {
+  EFFECTS,
+  BOOST,
+  UI,
+  clamp,
+  randRange
+} from './config.js';
 
 const TWO_PI = Math.PI * 2;
 
@@ -16,7 +22,6 @@ export class Effects {
     this.camera = camera;
     this.renderer = renderer;
 
-    // Camera shake state.
     this.shake = {
       remaining: 0,
       duration: 0,
@@ -24,7 +29,6 @@ export class Effects {
       offset: new THREE.Vector3()
     };
 
-    // Popup layer (DOM).
     this.popupLayer = document.getElementById('popup-layer');
     if (!this.popupLayer) {
       this.popupLayer = document.createElement('div');
@@ -33,22 +37,22 @@ export class Effects {
       document.body.appendChild(this.popupLayer);
     }
 
-    // Counter tween tracking so rapid updates cancel cleanly.
     this._counterTweens = new WeakMap();
-
-    // Reusable vectors to avoid allocations.
     this._tmpV = new THREE.Vector3();
 
-    // Track active looping tweens.
     this._menuBounceTween = null;
-    this._turboPulseCar = null;
+    this._boostPulseTween = null;
+    this._boostPulseCar = null;
+
+    this.boostSparkles = [];
 
     this._initRibbons();
     this._initParticles();
+    this._initBoostSparkles();
   }
 
   // ===========================================================================
-  // SPEED RIBBONS
+  // RIBBONS
   // ===========================================================================
   _initRibbons() {
     this.ribbonGroup = new THREE.Group();
@@ -57,6 +61,8 @@ export class Effects {
 
     this.ribbons = [];
     const geom = new THREE.BoxGeometry(0.06, 1.8, 0.06);
+    this._ribbonGeom = geom;
+
     for (let i = 0; i < EFFECTS.speedRibbonCount; i++) {
       const mat = new THREE.MeshBasicMaterial({
         color: 0xeaf8ff,
@@ -68,50 +74,45 @@ export class Effects {
       });
       const mesh = new THREE.Mesh(geom, mat);
       mesh.position.set(0, -1000, 0);
-      mesh.userData = { life: 0, maxLife: 0.4, vx: 0, vy: 0, vz: 0 };
+      mesh.userData = { life: 0, maxLife: 0.4 };
       this.ribbonGroup.add(mesh);
       this.ribbons.push(mesh);
     }
-    this._ribbonGeom = geom;
-    this._ribbonGeomShared = true;
   }
 
-  updateRibbons(dt, car, speedFactor) {
+  updateRibbons(dt, car, speedFactor, boostActive) {
     if (!car || !car.group) return;
     const sf = clamp(speedFactor || 0, 0, 1);
+    const boostMul = boostActive ? BOOST.ribbonBoost : 1;
     const pos = car.group.position;
 
-    // Spawn probability per frame scales with speed.
-    const spawnChance = Math.max(0, (sf - 0.25)) * 0.9;
+    const spawnChance = Math.max(0, (sf - 0.25)) * 0.9 * boostMul;
 
     for (let i = 0; i < this.ribbons.length; i++) {
       const r = this.ribbons[i];
       const u = r.userData;
-
       u.life -= dt;
 
       if (u.life <= 0) {
         if (sf > 0.2 && Math.random() < spawnChance) {
-          // Spawn a fresh streak behind the car at a random offset.
           const offX = randRange(-2.8, 2.8);
           const offY = randRange(0.2, 1.4);
           const offZ = randRange(1.6, 5.5);
           r.position.set(pos.x + offX, offY, pos.z + offZ);
           u.maxLife = randRange(0.28, 0.55);
           u.life = u.maxLife;
-          const scaleBase = randRange(0.7, 1.35);
-          r.scale.set(scaleBase, scaleBase * randRange(0.8, 1.6), scaleBase);
+          const sb = randRange(0.7, 1.35);
+          r.scale.set(sb, sb * randRange(0.8, 1.6), sb);
+          r.material.color.setHex(boostActive ? 0xffd76a : 0xeaf8ff);
         } else {
           r.material.opacity = Math.max(0, r.material.opacity - dt * 5);
-          if (r.material.opacity <= 0.001) {
-            r.position.set(0, -1000, 0);
-          }
+          if (r.material.opacity <= 0.001) r.position.set(0, -1000, 0);
           continue;
         }
       }
 
       const t = clamp(u.life / u.maxLife, 0, 1);
-      r.material.opacity = t * sf * 0.85;
+      r.material.opacity = t * sf * (boostActive ? 1.0 : 0.85);
     }
   }
 
@@ -126,6 +127,8 @@ export class Effects {
 
     this.particles = [];
     const geom = new THREE.OctahedronGeometry(1, 0);
+    this._particleGeom = geom;
+
     for (let i = 0; i < EFFECTS.particleBurstCount; i++) {
       const mat = new THREE.MeshBasicMaterial({
         color: 0xffcc33,
@@ -144,14 +147,12 @@ export class Effects {
       this.particleGroup.add(mesh);
       this.particles.push(mesh);
     }
-    this._particleGeom = geom;
   }
 
   spawnCollisionBurst(worldPos, colorHex = 0xffcc33) {
     for (let i = 0; i < this.particles.length; i++) {
       const p = this.particles[i];
       const u = p.userData;
-
       p.position.copy(worldPos);
       p.position.x += randRange(-0.4, 0.4);
       p.position.y += randRange(0.0, 0.8);
@@ -163,7 +164,6 @@ export class Effects {
       u.vx = Math.sin(phi) * Math.cos(theta) * speed;
       u.vy = Math.abs(Math.cos(phi)) * speed * 0.9 + 2.2;
       u.vz = Math.sin(phi) * Math.sin(theta) * speed;
-
       u.maxLife = EFFECTS.particleBurstLife * randRange(0.65, 1.0);
       u.life = u.maxLife;
       u.size = EFFECTS.particleBurstSize * randRange(0.7, 1.5);
@@ -197,7 +197,6 @@ export class Effects {
       p.position.y += u.vy * dt;
       p.position.z += u.vz * dt;
 
-      // Ground bounce.
       if (p.position.y < 0.16) {
         p.position.y = 0.16;
         u.vy *= -0.42;
@@ -212,6 +211,78 @@ export class Effects {
       p.rotation.y += dt * 8.0;
     }
     if (!any) this.particleGroup.visible = false;
+  }
+
+  // ===========================================================================
+  // BOOST SPARKLES
+  // ===========================================================================
+  _initBoostSparkles() {
+    this.boostSparkleGroup = new THREE.Group();
+    this.boostSparkleGroup.name = 'BoostSparkles';
+    this.scene.add(this.boostSparkleGroup);
+
+    const geom = new THREE.TetrahedronGeometry(0.16, 0);
+    this._sparkleGeom = geom;
+
+    for (let i = 0; i < 24; i++) {
+      const mat = new THREE.MeshBasicMaterial({
+        color: i % 2 === 0 ? 0xffd76a : 0x7ae8ff,
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      });
+      const m = new THREE.Mesh(geom, mat);
+      m.visible = false;
+      m.userData = { life: 0, maxLife: 0.5, vx: 0, vy: 0, vz: 0, spin: randRange(-8, 8) };
+      this.boostSparkleGroup.add(m);
+      this.boostSparkles.push(m);
+    }
+  }
+
+  spawnBoostSparkles(worldPos) {
+    for (let i = 0; i < this.boostSparkles.length; i++) {
+      const s = this.boostSparkles[i];
+      if (s.userData.life > 0) continue;
+      s.position.copy(worldPos);
+      s.position.x += randRange(-0.6, 0.6);
+      s.position.y += randRange(0.1, 0.9);
+      s.position.z += randRange(-0.3, 0.5);
+      s.userData.vx = randRange(-3.5, 3.5);
+      s.userData.vy = randRange(2.0, 5.5);
+      s.userData.vz = randRange(2.0, 6.0);
+      s.userData.maxLife = randRange(0.35, 0.7);
+      s.userData.life = s.userData.maxLife;
+      s.scale.setScalar(randRange(0.6, 1.3));
+      s.material.opacity = 1;
+      s.visible = true;
+      s.rotation.set(Math.random() * TWO_PI, Math.random() * TWO_PI, Math.random() * TWO_PI);
+    }
+  }
+
+  updateBoostSparkles(dt) {
+    let any = false;
+    for (let i = 0; i < this.boostSparkles.length; i++) {
+      const s = this.boostSparkles[i];
+      const u = s.userData;
+      if (u.life <= 0) continue;
+      any = true;
+      u.life -= dt;
+      if (u.life <= 0) {
+        s.visible = false;
+        s.material.opacity = 0;
+        continue;
+      }
+      u.vy -= 5.5 * dt;
+      s.position.x += u.vx * dt;
+      s.position.y += u.vy * dt;
+      s.position.z += u.vz * dt;
+      s.rotation.y += u.spin * dt;
+      const t = u.life / u.maxLife;
+      s.material.opacity = t;
+    }
+    if (!any) this.boostSparkleGroup.visible = false;
+    else this.boostSparkleGroup.visible = true;
   }
 
   // ===========================================================================
@@ -293,21 +364,36 @@ export class Effects {
   coinPop(worldPos) {
     this.popupWorld(worldPos, '+25', 'popup-coin');
   }
-
   crownPop(worldPos) {
     this.popupWorld(worldPos, '+150', 'popup-crown');
   }
-
   passPop(worldPos) {
     this.popupWorld(worldPos, '+50', 'popup-pass');
   }
-
   checkpointPop(worldPos) {
     this.popupWorld(worldPos, 'CHECKPOINT!', 'popup-checkpoint');
   }
-
-  turboPop(worldPos) {
-    this.popupWorld(worldPos, 'TURBO!', 'popup-turbo');
+  boostPop(worldPos) {
+    this.popupWorld(worldPos, 'BOOST!', 'popup-turbo');
+  }
+  levelCompleteFlash(text = 'LEVEL COMPLETE!') {
+    const el = document.createElement('div');
+    el.className = 'score-popup popup-level';
+    el.textContent = text;
+    el.style.left = '50%';
+    el.style.top = '40%';
+    this.popupLayer.appendChild(el);
+    anime({
+      targets: el,
+      scale: [0.3, 1.4, 1.0],
+      opacity: [0, 1, 1, 0],
+      translateY: [0, -30, -70],
+      duration: 1400,
+      easing: 'easeOutCubic',
+      complete: () => {
+        if (el.parentNode) el.parentNode.removeChild(el);
+      }
+    });
   }
 
   // ===========================================================================
@@ -332,7 +418,7 @@ export class Effects {
   }
 
   // ===========================================================================
-  // CHECKPOINT GATE PULSE
+  // CHECKPOINT PULSE
   // ===========================================================================
   pulseCheckpoint(cpGroup) {
     if (!cpGroup) return;
@@ -349,7 +435,7 @@ export class Effects {
   }
 
   // ===========================================================================
-  // MENU IDLE BOUNCE
+  // MENU BOUNCE
   // ===========================================================================
   startMenuBounce(carGroup) {
     this.stopMenuBounce();
@@ -375,37 +461,44 @@ export class Effects {
   }
 
   // ===========================================================================
-  // TURBO GLOW PULSE (scale pulse; opacity driven by car.js)
+  // BOOST PULSE
   // ===========================================================================
-  startTurboPulse(car) {
-    this.stopTurboPulse();
-    if (!car || !car.glowPlane) return;
-    this._turboPulseCar = car;
+  startBoostPulse(car) {
+    if (this._boostPulseCar === car && this._boostPulseTween) return;
+    this.stopBoostPulse();
+    if (!car || !car.glowPlane) {
+      // No glow plane on new car — still track for sparkle timing.
+      this._boostPulseCar = car;
+      return;
+    }
+    this._boostPulseCar = car;
     const s = car.glowPlane.scale;
     anime.remove(s);
-    car._turboTween = anime({
+    this._boostPulseTween = anime({
       targets: s,
       x: [1.0, 1.25, 1.0],
       y: [1.0, 1.25, 1.0],
-      duration: Math.max(120, 1000 / EFFECTS.turboGlowPulseFreq) * 2,
+      duration: 500,
       loop: true,
       easing: 'easeInOutSine'
     });
   }
 
-  stopTurboPulse() {
-    const car = this._turboPulseCar;
+  stopBoostPulse() {
+    const car = this._boostPulseCar;
     if (car) {
-      if (car._turboTween) {
-        car._turboTween.pause();
-        car._turboTween = null;
+      if (this._boostPulseTween) {
+        this._boostPulseTween.pause();
+        this._boostPulseTween = null;
       }
-      if (car.glowPlane) {
-        car.glowPlane.scale.set(1, 1, 1);
-      }
-      this._turboPulseCar = null;
+      if (car.glowPlane) car.glowPlane.scale.set(1, 1, 1);
+      this._boostPulseCar = null;
     }
   }
+
+  // Backwards-compatible aliases used by game.js
+  startTurboPulse(car) { this.startBoostPulse(car); }
+  stopTurboPulse() { this.stopBoostPulse(); }
 
   // ===========================================================================
   // OVERLAY FADE
@@ -441,8 +534,10 @@ export class Effects {
   // ===========================================================================
   update(dt, car, speedFactor) {
     this.updateShake(dt);
-    this.updateRibbons(dt, car, speedFactor);
+    const boostActive = !!(car && car.boostActive);
+    this.updateRibbons(dt, car, speedFactor, boostActive);
     this.updateParticles(dt);
+    this.updateBoostSparkles(dt);
   }
 
   // ===========================================================================
@@ -450,23 +545,26 @@ export class Effects {
   // ===========================================================================
   dispose() {
     this.stopMenuBounce();
-    this.stopTurboPulse();
+    this.stopBoostPulse();
 
-    // Ribbons.
     for (const r of this.ribbons) {
       if (r.material) r.material.dispose();
     }
     if (this._ribbonGeom) this._ribbonGeom.dispose();
     this.scene.remove(this.ribbonGroup);
 
-    // Particles.
     for (const p of this.particles) {
       if (p.material) p.material.dispose();
     }
     if (this._particleGeom) this._particleGeom.dispose();
     this.scene.remove(this.particleGroup);
 
-    // Popups.
+    for (const s of this.boostSparkles) {
+      if (s.material) s.material.dispose();
+    }
+    if (this._sparkleGeom) this._sparkleGeom.dispose();
+    this.scene.remove(this.boostSparkleGroup);
+
     if (this.popupLayer) {
       while (this.popupLayer.firstChild) {
         this.popupLayer.removeChild(this.popupLayer.firstChild);
