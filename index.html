@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#2aa7e8" />
+  <title>Meow Racing</title>
+  <link rel="stylesheet" href="css/style.css" />
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+      "cannon-es": "https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js",
+      "animejs": "https://cdn.jsdelivr.net/npm/animejs@3.2.2/lib/anime.es.js"
+    }
+  }
+  </script>
+</head>
+<body>
+  <!-- ============================== CANVAS ============================== -->
+  <canvas id="game-canvas"></canvas>
+
+  <!-- ============================== HUD ================================ -->
+  <div id="hud" class="hud">
+
+    <!-- Top-left counters -->
+    <div class="hud-topleft">
+      <div class="counter counter-coin">
+        <span class="counter-icon coin-icon" aria-hidden="true">&#9679;</span>
+        <span id="hud-coins" class="counter-value">0</span>
+      </div>
+      <div class="counter counter-crown">
+        <span class="counter-icon crown-icon" aria-hidden="true">&#9818;</span>
+        <span id="hud-crowns" class="counter-value">0</span>
+      </div>
+    </div>
+
+    <!-- Top-center timer -->
+    <div class="hud-topcenter">
+      <div class="time-pill">
+        <span class="time-icon" aria-hidden="true">&#9201;</span>
+        <span id="hud-time" class="time-value">60</span>
+      </div>
+    </div>
+
+    <!-- Top-right score / distance -->
+    <div class="hud-topright">
+      <div class="stat stat-score">
+        <span class="stat-label">SCORE</span>
+        <span id="hud-score" class="stat-value">0</span>
+      </div>
+      <div class="stat stat-distance">
+        <span id="hud-distance" class="stat-value">0m</span>
+      </div>
+    </div>
+
+    <!-- Bottom-left lives -->
+    <div class="hud-bottomleft">
+      <div id="hud-lives" class="lives"></div>
+    </div>
+
+    <!-- Bottom-right speed + turbo -->
+    <div class="hud-bottomright">
+      <div class="speedometer">
+        <span id="hud-speed" class="speed-value">0</span>
+        <span class="speed-unit">KM/H</span>
+      </div>
+      <div class="turbo-bar" title="Turbo">
+        <div id="hud-turbo-fill" class="turbo-fill"></div>
+      </div>
+    </div>
+
+    <!-- Touch controls -->
+    <div class="touch-controls">
+      <div class="touch-left">
+        <button id="touch-left" class="touch-btn touch-steer" aria-label="Steer left">
+          <span>&#9664;</span>
+        </button>
+        <button id="touch-right" class="touch-btn touch-steer" aria-label="Steer right">
+          <span>&#9654;</span>
+        </button>
+      </div>
+      <div class="touch-right">
+        <button id="touch-brake" class="touch-btn touch-brake" aria-label="Brake">
+          <span>&#9660;</span>
+        </button>
+        <button id="touch-gas" class="touch-btn touch-gas" aria-label="Accelerate">
+          <span>&#9650;</span>
+        </button>
+        <button id="touch-turbo" class="touch-btn touch-turbo" aria-label="Turbo">
+          <span>TURBO</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================ POPUP LAYER ========================== -->
+  <div id="popup-layer" class="popup-layer"></div>
+
+  <!-- ============================= MENU ================================ -->
+  <div id="menu-overlay" class="overlay menu-overlay">
+    <div class="menu-content">
+      <div class="logo">
+        <h1 class="logo-title">
+          <span class="logo-meow">MEOW</span>
+          <span class="logo-racing">RACING</span>
+        </h1>
+        <div class="logo-underline"></div>
+        <p class="logo-subtitle">Full Speed, Nine Lives</p>
+      </div>
+
+      <button id="go-button" class="go-button">
+        <span class="go-text">GO</span>
+        <span class="go-glow"></span>
+      </button>
+
+      <div class="menu-hint">
+        <span class="hint-item"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> drive</span>
+        <span class="hint-item"><kbd>Space</kbd> turbo</span>
+        <span class="hint-item"><kbd>C</kbd> color</span>
+      </div>
+    </div>
+
+    <button id="help-button" class="corner-button corner-left" aria-label="Help">
+      <span class="corner-icon">?</span>
+    </button>
+    <button id="settings-button" class="corner-button corner-right" aria-label="Settings">
+      <span class="corner-icon">&#9881;</span>
+    </button>
+  </div>
+
+  <!-- =========================== GAME OVER ============================= -->
+  <div id="game-over-overlay" class="overlay game-over-overlay">
+    <div class="overlay-card">
+      <h2 class="overlay-title overlay-title-fail">GAME OVER</h2>
+      <p class="overlay-score-label">Final Score</p>
+      <p id="final-score" class="overlay-score">0</p>
+      <button id="restart-button" class="primary-button">
+        <span>PLAY AGAIN</span>
+      </button>
+      <p class="overlay-hint">Press <kbd>R</kbd> to restart</p>
+    </div>
+  </div>
+
+  <!-- ============================== WIN ================================ -->
+  <div id="win-overlay" class="overlay win-overlay">
+    <div class="overlay-card win-card">
+      <h2 class="overlay-title overlay-title-win">YOU WIN!</h2>
+      <p class="overlay-score-label">Score</p>
+      <p id="win-score" class="overlay-score">0</p>
+      <button id="win-restart-button" class="primary-button win-button">
+        <span>RACE AGAIN</span>
+      </button>
+      <p class="overlay-hint">Press <kbd>R</kbd> to restart</p>
+    </div>
+  </div>
+
+  <!-- ============================ HELP PANEL =========================== -->
+  <div id="help-panel" class="panel">
+    <div class="panel-inner">
+      <h3 class="panel-title">How to Play</h3>
+      <ul class="panel-list">
+        <li><kbd>&#8592;</kbd><kbd>&#8594;</kbd> or <kbd>A</kbd><kbd>D</kbd> &mdash; Steer</li>
+        <li><kbd>&#8593;</kbd> or <kbd>W</kbd> &mdash; Accelerate</li>
+        <li><kbd>&#8595;</kbd> or <kbd>S</kbd> &mdash; Brake</li>
+        <li><kbd>Space</kbd> &mdash; Turbo boost</li>
+        <li><kbd>Enter</kbd> &mdash; Start game</li>
+        <li><kbd>R</kbd> &mdash; Restart</li>
+        <li><kbd>C</kbd> &mdash; Cycle car color (menu)</li>
+      </ul>
+      <p class="panel-tip">Pass traffic for bonus points, collect coins and crowns, and grab turbo pickups. Reach checkpoints to extend your time. Lose all lives or run out of time and it's game over!</p>
+    </div>
+  </div>
+
+  <!-- ========================== SETTINGS PANEL ========================= -->
+  <div id="settings-panel" class="panel">
+    <div class="panel-inner">
+      <h3 class="panel-title">Settings</h3>
+      <p class="panel-row">Quality: <strong>Auto</strong></p>
+      <p class="panel-row">Shadows: <strong>On</strong></p>
+      <p class="panel-row">Audio: <strong>On</strong></p>
+      <p class="panel-tip">Settings are saved automatically. For best performance, use a modern browser with WebGL enabled.</p>
+    </div>
+  </div>
+
+  <!-- ============================ BOOT SCRIPT ========================== -->
+  <script type="module" src="js/game.js"></script>
+</body>
+</html>
