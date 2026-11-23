@@ -64,15 +64,14 @@
     </div>
 
     <div class="hud-bottomright">
-      <div class="speedometer">
-        <span id="hud-speed" class="speed-value">0</span>
-        <span class="speed-unit">KM/H</span>
-      </div>
-      <div class="boost-bar" title="Boost">
-        <div class="boost-bar-label">BOOST</div>
-        <div class="boost-bar-track">
-          <div id="hud-turbo-fill" class="boost-fill"></div>
+      <div class="top-speedo">
+        <div class="speedo-ring">
+          <div class="speedo-inner">
+            <span id="hud-speed-big" class="speedo-value">0</span>
+            <span class="speedo-unit">KM/H</span>
+          </div>
         </div>
+        <div class="speedo-boost"><div class="speedo-boost-fill" id="hud-turbo-fill"></div></div>
       </div>
     </div>
 
@@ -103,7 +102,6 @@
   </div>
 
   <!-- Original-look HUD extras (Gemini) -->
-  <div id="hud-speed-big">0</div>
   <div id="hud-combo"></div>
   <div id="desktop-hints">
     <span>[A/D or Left/Right] Steer</span>

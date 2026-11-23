@@ -445,18 +445,18 @@ export class Car {
     this.steerTarget = -steerInput * 0.5;
     this.steer += (this.steerTarget - this.steer) * Math.min(1, dt * 10);
 
-    // ----- Longitudinal speed (AUTO-ACCELERATE like the original) -----
+    // ----- Longitudinal speed (MANUAL GAS / BRAKE / COAST) -----
     const maxSpeed = CAR.maxSpeed * (this.boostActive ? BOOST.speedMult : 1);
-    const minCruise = CAR.maxSpeed * 0.25;
-    if (input.brake) {
+    if (input.gas) {
+      this.speed += CAR.accel * dt;
+    } else if (input.brake) {
       this.speed -= CAR.brakeDecel * dt;
     } else {
-      // Always drive forward; gas adds a stronger push, boost adds more.
-      const accel = CAR.accel * 0.65 + (input.gas ? CAR.accel : 0) + (this.boostActive ? CAR.accel * 0.5 : 0);
-      this.speed += accel * dt;
+      const decel = CAR.coastDecel * dt;
+      if (this.speed > 0) this.speed = Math.max(0, this.speed - decel);
+      else if (this.speed < 0) this.speed = Math.min(0, this.speed + decel);
     }
-    // Never fully stop while the game is playing.
-    this.speed = clamp(this.speed, minCruise, maxSpeed);
+    this.speed = clamp(this.speed, -CAR.reverseMax, maxSpeed);
 
     this.braking = !!input.brake;
 

@@ -1005,10 +1005,11 @@ export class Game {
 
   _updateHud() {
     if (this.hud.time) this.hud.time.textContent = Math.ceil(this.timer);
-    if (this.hud.speed) this.hud.speed.textContent = Math.round(Math.abs(this.car.speed) * 3.6);
 
-    const speedBigEl = document.getElementById('hud-speed-big');
-    if (speedBigEl && this.car) speedBigEl.textContent = `${Math.round(Math.abs(this.car.speed || 0))}`;
+    const sb = document.getElementById('hud-speed-big');
+    if (sb) sb.textContent = String(Math.round(Math.abs(this.car.speed || 0) * 3.6));
+    const bf = document.getElementById('hud-turbo-fill');
+    if (bf && this.car) bf.style.width = Math.max(0, Math.min(100, (this.car.boostAmount / (BOOST.max || 100)) * 100)) + '%';
     const comboEl = document.getElementById('hud-combo');
     if (comboEl) {
       const c = this.combo || 0;
