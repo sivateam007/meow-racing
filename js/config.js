@@ -334,7 +334,17 @@ export const LEVELS = [
   { id: 7,  name: 'Desert Run',       theme: 'desert',   targetDistance: 2600, timeLimit: 80, trafficDensity: 1.95, trafficSpeedMult: 1.30, coinRate: 1.30 },
   { id: 8,  name: 'Mountain Pass',    theme: 'mountain', targetDistance: 2900, timeLimit: 82, trafficDensity: 2.10, trafficSpeedMult: 1.35, coinRate: 1.40 },
   { id: 9,  name: 'Jungle Speedway',  theme: 'jungle',   targetDistance: 3200, timeLimit: 85, trafficDensity: 2.25, trafficSpeedMult: 1.40, coinRate: 1.50 },
-  { id: 10, name: 'Meow Grand Prix',  theme: 'final',    targetDistance: 3600, timeLimit: 90, trafficDensity: 2.40, trafficSpeedMult: 1.50, coinRate: 1.60 }
+  { id: 10, name: 'Meow Grand Prix',  theme: 'final',    targetDistance: 3600, timeLimit: 90, trafficDensity: 2.40, trafficSpeedMult: 1.50, coinRate: 1.60 },
+  { id: 11, name: 'Sunlit Cove Blitz', theme: 'beach', targetDistance: 3900, timeLimit: 92, trafficDensity: 2.5, trafficSpeedMult: 1.55, coinRate: 1.7 },
+  { id: 12, name: 'Tidebreaker Coast', theme: 'coastal', targetDistance: 4120, timeLimit: 95, trafficDensity: 2.62, trafficSpeedMult: 1.6, coinRate: 1.78 },
+  { id: 13, name: 'Dockyard Rush Hour', theme: 'harbour', targetDistance: 4340, timeLimit: 98, trafficDensity: 2.74, trafficSpeedMult: 1.65, coinRate: 1.86 },
+  { id: 14, name: 'Skyline Overdrive', theme: 'city', targetDistance: 4560, timeLimit: 101, trafficDensity: 2.86, trafficSpeedMult: 1.7, coinRate: 1.95 },
+  { id: 15, name: 'Amber Horizon Run', theme: 'sunset', targetDistance: 4780, timeLimit: 104, trafficDensity: 2.98, trafficSpeedMult: 1.75, coinRate: 2.05 },
+  { id: 16, name: 'Neon Afterburner', theme: 'night', targetDistance: 5000, timeLimit: 107, trafficDensity: 3.1, trafficSpeedMult: 1.8, coinRate: 2.15 },
+  { id: 17, name: 'Mirage Ridge Dash', theme: 'desert', targetDistance: 5220, timeLimit: 110, trafficDensity: 3.22, trafficSpeedMult: 1.85, coinRate: 2.24 },
+  { id: 18, name: 'Summit Switchbacks', theme: 'mountain', targetDistance: 5450, timeLimit: 113, trafficDensity: 3.34, trafficSpeedMult: 1.9, coinRate: 2.32 },
+  { id: 19, name: 'Canopy Turbo Trail', theme: 'jungle', targetDistance: 5720, timeLimit: 116, trafficDensity: 3.48, trafficSpeedMult: 1.95, coinRate: 2.41 },
+  { id: 20, name: 'Meow Grand Finale', theme: 'final', targetDistance: 6000, timeLimit: 120, trafficDensity: 3.6, trafficSpeedMult: 2.0, coinRate: 2.5 }
 ];
 
 // -----------------------------------------------------------------------------

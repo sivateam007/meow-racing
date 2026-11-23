@@ -862,7 +862,8 @@ export class Game {
       }
     }
 
-    this.world.update(dt, pos.z, pos.x);
+    const speedFactor = clamp(Math.abs(this.car.speed) / Math.max(1, CAR.maxSpeed), 0, 1);
+    this.world.update(dt, pos.z, pos.x, speedFactor);
 
     // Pickups
     const collected = this.world.collectNearby(pos, 1.6);
@@ -905,7 +906,6 @@ export class Game {
     }
 
     // Effects
-    const speedFactor = clamp(Math.abs(this.car.speed) / CAR.maxSpeed, 0, 1);
     this.effects.update(dt, this.car, speedFactor);
 
     // Level completion check
@@ -1006,6 +1006,16 @@ export class Game {
   _updateHud() {
     if (this.hud.time) this.hud.time.textContent = Math.ceil(this.timer);
     if (this.hud.speed) this.hud.speed.textContent = Math.round(Math.abs(this.car.speed) * 3.6);
+
+    const speedBigEl = document.getElementById('hud-speed-big');
+    if (speedBigEl && this.car) speedBigEl.textContent = `${Math.round(Math.abs(this.car.speed || 0))}`;
+    const comboEl = document.getElementById('hud-combo');
+    if (comboEl) {
+      const c = this.combo || 0;
+      comboEl.textContent = c > 1 ? `x${c} COMBO` : '';
+    }
+    const hintsEl = document.getElementById('desktop-hints');
+    if (hintsEl) hintsEl.style.display = this.isTouch ? 'none' : 'flex';
 
     const scoreInt = Math.round(this.score);
     if (scoreInt !== this._display.score) {

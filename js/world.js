@@ -83,6 +83,9 @@ export class World {
     this._buildMenuPlatform();
     this._buildRoadTextures();
     this._initRoadSegments();
+    this._initRoadFx();
+    this._initSpeedRibbons();
+    this._initRoadsideDetail();
     this._initTraffic();
     this._initPickups();
     this._initCheckpoints();
@@ -1522,10 +1525,155 @@ export class World {
     return hit;
   }
 
+  _initRoadFx() {
+    const geo = new THREE.PlaneGeometry(0.45, 2.4);
+    geo.rotateX(-Math.PI / 2);
+    const colors = [0x00f5d4, 0xffffff, 0xffd166];
+    this.roadFx = [];
+    this.roadFxTimer = 0;
+    const maxZ = -ROAD.segmentLength * ROAD.segmentsAhead;
+    const halfW = ROAD.width * 0.45;
+    for (let i = 0; i < 40; i++) {
+      const mat = new THREE.MeshBasicMaterial({
+        color: colors[i % colors.length],
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set((Math.random() * 2 - 1) * halfW, 0.04, maxZ + Math.random() * (-maxZ));
+      mesh.visible = false;
+      this.scene.add(mesh);
+      this.roadFx.push({ mesh, mat, phase: i * 0.7 });
+    }
+  }
+
+  _updateRoadFx(dt, speedFactor = 0) {
+    if (!this.roadFx) return;
+    const farZ = -ROAD.segmentLength * ROAD.segmentsAhead;
+    const halfW = ROAD.width * 0.45;
+    const scrollSpeed = 60 + speedFactor * 90;
+    this.roadFxTimer += dt;
+    let spawned = false;
+    if (this.roadFxTimer >= 0.12) {
+      this.roadFxTimer = 0;
+      spawned = true;
+    }
+    for (let i = 0; i < this.roadFx.length; i++) {
+      const item = this.roadFx[i];
+      if (!item.mesh.visible && spawned) {
+        item.mesh.position.set((Math.random() * 2 - 1) * halfW, 0.04, farZ);
+        item.mesh.visible = true;
+        spawned = false;
+      }
+      if (!item.mesh.visible) continue;
+      item.mesh.position.z += scrollSpeed * dt;
+      if (item.mesh.position.z > 8) {
+        item.mesh.position.z = farZ;
+        item.mesh.position.x = (Math.random() * 2 - 1) * halfW;
+      }
+      const pulse = 0.5 + 0.5 * Math.sin(this.time * 6 + item.phase);
+      item.mat.opacity = pulse * (0.25 + speedFactor * 0.55);
+    }
+  }
+
+  _initSpeedRibbons() {
+    const length = ROAD.segmentLength * ROAD.segmentsAhead;
+    const geo = new THREE.PlaneGeometry(0.32, length);
+    geo.rotateX(-Math.PI / 2);
+    this.speedRibbons = [];
+    const xPos = ROAD.width * 0.5 - 0.35;
+    [-1, 1].forEach((side, idx) => {
+      const mat = new THREE.MeshBasicMaterial({
+        color: idx === 0 ? 0x00e5ff : 0xff2a85,
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set(side * xPos, 0.06, -length * 0.5);
+      mesh.visible = false;
+      this.scene.add(mesh);
+      this.speedRibbons.push({ mesh, mat });
+    });
+  }
+
+  _updateSpeedRibbons(dt, speedFactor = 0) {
+    if (!this.speedRibbons) return;
+    const active = speedFactor > 0.6;
+    const targetOpacity = active ? Math.min(0.65, (speedFactor - 0.6) * 1.5) : 0;
+    for (let i = 0; i < this.speedRibbons.length; i++) {
+      const r = this.speedRibbons[i];
+      r.mat.opacity += (targetOpacity - r.mat.opacity) * Math.min(1, dt * 10);
+      r.mesh.visible = r.mat.opacity > 0.01;
+      const scaleZ = active ? 0.85 + 0.15 * Math.sin(this.time * 18 + i) : 1;
+      r.mesh.scale.set(1, 1, scaleZ);
+    }
+  }
+
+  _initRoadsideDetail() {
+    const tier = String(this.perfTier || 'high').toLowerCase();
+    const count = tier === 'low' ? 18 : tier === 'medium' ? 36 : 56;
+    const halfRoad = (ROAD && ROAD.width ? ROAD.width : 12) * 0.5;
+    const segLen = ROAD && ROAD.segmentLength ? ROAD.segmentLength : 60;
+    const ahead = ROAD && ROAD.segmentsAhead ? ROAD.segmentsAhead : 6;
+    const spanZ = segLen * ahead;
+
+    this._detailBushGeo = this._detailBushGeo || new THREE.DodecahedronGeometry(1.1, 0);
+    this._detailSignGeo = this._detailSignGeo || new THREE.BoxGeometry(0.45, 2.2, 0.16);
+    this._detailHillGeo = this._detailHillGeo || new THREE.ConeGeometry(8.5, 9.0, 6);
+
+    const accentHex = (this.theme && (this.theme.accent || this.theme.scenery || this.theme.sky)) || 0x22c55e;
+    const hillHex = (this.theme && (this.theme.horizon || this.theme.fog || this.theme.sky)) || 0x38bdf8;
+
+    this._detailBushMat = this._detailBushMat || new THREE.MeshStandardMaterial({ color: accentHex, roughness: 0.75 });
+    this._detailSignMat = this._detailSignMat || new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.4 });
+    this._detailHillMat = this._detailHillMat || new THREE.MeshStandardMaterial({ color: hillHex, roughness: 0.9 });
+
+    this.roadsideDetail = [];
+    for (let i = 0; i < count; i++) {
+      const kind = i % 3;
+      const geo = kind === 0 ? this._detailBushGeo : kind === 1 ? this._detailSignGeo : this._detailHillGeo;
+      const mat = kind === 0 ? this._detailBushMat : kind === 1 ? this._detailSignMat : this._detailHillMat;
+      const side = i % 2 === 0 ? -1 : 1;
+      const extraOut = kind === 2 ? 14 + (i % 5) * 4 : 3.2 + (i % 4) * 2.2;
+      const mesh = new THREE.Mesh(geo, mat);
+      const yBase = kind === 2 ? 4.2 : kind === 1 ? 1.1 : 0.75;
+      mesh.position.set(side * (halfRoad + extraOut), yBase, -((i / count) * spanZ));
+      if (kind === 0) {
+        const s = 0.7 + (i % 4) * 0.25;
+        mesh.scale.set(s * 1.2, s * 0.85, s);
+      }
+      this.scene.add(mesh);
+      this.roadsideDetail.push({ mesh, side, extraOut, yBase, kind });
+    }
+  }
+
+  _updateRoadsideDetail(dt, playerZ = 0) {
+    if (!Array.isArray(this.roadsideDetail) || this.roadsideDetail.length === 0) return;
+    const halfRoad = (ROAD && ROAD.width ? ROAD.width : 12) * 0.5;
+    const segLen = ROAD && ROAD.segmentLength ? ROAD.segmentLength : 60;
+    const ahead = ROAD && ROAD.segmentsAhead ? ROAD.segmentsAhead : 6;
+    const spanZ = segLen * ahead;
+    const recycleFrontZ = playerZ + 18;
+
+    for (let i = 0; i < this.roadsideDetail.length; i++) {
+      const item = this.roadsideDetail[i];
+      const m = item.mesh;
+      if (m.position.z > recycleFrontZ) {
+        m.position.z -= spanZ;
+        m.position.x = item.side * (halfRoad + item.extraOut);
+        m.position.y = item.yBase + (item.kind === 0 ? Math.sin((this.time || 0) * 2 + i) * 0.04 : 0);
+      }
+    }
+  }
+
   // ===========================================================================
   // PER-FRAME UPDATE
   // ===========================================================================
-  update(dt, playerZ, playerX) {
+  update(dt, playerZ, playerX, speedFactor = 0) {
     this.time += dt;
 
     if (this.sky) {
@@ -1571,6 +1719,9 @@ export class World {
     }
 
     this._recycleRoadSegments(playerZ);
+    this._updateRoadsideDetail(dt, playerZ);
+    this._updateRoadFx(dt, speedFactor);
+    this._updateSpeedRibbons(dt, speedFactor);
     this._updateTraffic(dt, playerZ);
     this._updatePickups(dt, playerZ);
     this._updateCheckpoints(dt, playerZ);

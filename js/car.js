@@ -11,6 +11,7 @@ import {
   SKINS,
   BOOST,
   DRIFT,
+  ROAD,
   clamp
 } from './config.js';
 
@@ -76,6 +77,33 @@ export class Car {
       }
     });
     if (this.shadowBlob) this.shadowBlob.castShadow = false;
+    this._applyGlossUpgrade();
+  }
+
+  _applyGlossUpgrade() {
+    const root = this.group;
+    if (!root) return;
+    root.traverse((obj) => {
+      if (!obj.isMesh || !obj.material) return;
+      const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+      mats.forEach((mat) => {
+        if ('metalness' in mat) mat.metalness = Math.max(mat.metalness || 0, 0.35);
+        if ('roughness' in mat) mat.roughness = Math.min(mat.roughness ?? 0.5, 0.28);
+        if ('clearcoat' in mat) mat.clearcoat = 0.85;
+        if ('clearcoatRoughness' in mat) mat.clearcoatRoughness = 0.12;
+        mat.needsUpdate = true;
+      });
+    });
+    if (!this._glossTrimAdded) {
+      this._glossTrimAdded = true;
+      const bumperMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.2, metalness: 0.75 });
+      const bumper = new THREE.Mesh(new THREE.BoxGeometry(1.65, 0.22, 0.24), bumperMat);
+      bumper.position.set(0, 0.34, -2.05);
+      root.add(bumper);
+      const spoiler = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.1, 0.32), bumperMat);
+      spoiler.position.set(0, 1.05, 1.85);
+      root.add(spoiler);
+    }
   }
 
   _buildBody() {
@@ -377,6 +405,7 @@ export class Car {
   // ---------------------------------------------------------------------------
   update(dt, input, allowControl = true) {
     if (dt <= 0) return;
+    this.offRoadTouch = false;
 
     if (!allowControl) {
       input = { left: false, right: false, gas: false, brake: false, turbo: false };
@@ -444,8 +473,11 @@ export class Car {
     // ----- Position -----
     const fx = -Math.sin(this.heading);
     const fz = -Math.cos(this.heading);
-    this.group.position.x += fx * this.speed * dt;
+    const half = ROAD.width / 2 - this.getBoundingRadius() * 0.6;
+    const nx = this.group.position.x + fx * this.speed * dt;
+    this.group.position.x = clamp(nx, -half, half);
     this.group.position.z += fz * this.speed * dt;
+    if (Math.abs(nx) > half) { this.speed *= 0.985; this.offRoadTouch = true; }
 
     // ----- Wheel spin -----
     this.wheelSpin -= (this.speed * dt) / this._wheelRadius;
