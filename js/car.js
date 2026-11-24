@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CAR_CFG, COLORS, clamp, lerp } from './config.js';
+import { CAR_CFG, COLORS, VEHICLE_TYPES, clamp, lerp } from './config.js';
 
 export class Car {
   constructor(scene, initialSkinId = 'meow_orange') {
@@ -138,6 +138,76 @@ export class Car {
     this.accentMat.color.setHex(found.accent);
     this.trimMat.color.setHex(found.trim);
   }
+
+setVehicleType(typeKey) {
+    const spec = typeof VEHICLE_TYPES !== 'undefined' && VEHICLE_TYPES[typeKey];
+    if (!spec || !this.chassis) return;
+
+    this.vehicleType = typeKey;
+    const w = spec.w || CAR_CFG.width;
+    const h = spec.h || CAR_CFG.height;
+    const l = spec.l || CAR_CFG.length;
+    const bodyHex = (spec.colors && spec.colors[0]) || COLORS.carBodyDefault;
+
+    while (this.chassis.children.length > 0) {
+      this.chassis.remove(this.chassis.children[0]);
+    }
+    this.wheels = [];
+    this.frontPivots = [];
+    this.rearWheelPositions = [];
+
+    this.bodyMat = new THREE.MeshStandardMaterial({ color: bodyHex, roughness: 0.28, metalness: 0.4 });
+    this.accentMat = new THREE.MeshStandardMaterial({ color: COLORS.carAccentDefault, roughness: 0.35, metalness: 0.2 });
+    const cabinMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.14, metalness: 0.78 });
+    const tireMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.85 });
+
+    const wheelR = typeKey === 'bike' ? 0.38 : CAR_CFG.wheelRadius;
+    const lowerH = typeKey === 'bike' ? h * 0.45 : h * 0.52;
+    const bodyW = typeKey === 'bike' ? Math.max(0.5, w * 0.65) : w;
+
+    const bodyMesh = new THREE.Mesh(new THREE.BoxGeometry(bodyW, lowerH, l), this.bodyMat);
+    bodyMesh.position.y = wheelR + lowerH * 0.5;
+    bodyMesh.castShadow = true;
+    bodyMesh.receiveShadow = true;
+    this.chassis.add(bodyMesh);
+
+    const cabinMesh = new THREE.Mesh(
+      new THREE.BoxGeometry(bodyW * 0.78, Math.max(0.35, h - lowerH), l * 0.52),
+      typeKey === 'bike' ? this.accentMat : cabinMat
+    );
+    cabinMesh.position.set(0, wheelR + lowerH + Math.max(0.35, h - lowerH) * 0.5 - 0.03, -0.1);
+    cabinMesh.castShadow = true;
+    this.chassis.add(cabinMesh);
+
+    const wheelGeo = new THREE.CylinderGeometry(wheelR, wheelR, CAR_CFG.wheelWidth, 12);
+    wheelGeo.rotateZ(Math.PI * 0.5);
+
+    const coords =
+      typeKey === 'bike'
+        ? [
+            { x: 0, z: l * 0.34, front: true },
+            { x: 0, z: -l * 0.34, front: false }
+          ]
+        : [
+            { x: -w * 0.52, z: l * 0.32, front: true },
+            { x: w * 0.52, z: l * 0.32, front: true },
+            { x: -w * 0.52, z: -l * 0.32, front: false },
+            { x: w * 0.52, z: -l * 0.32, front: false }
+          ];
+
+    for (const c of coords) {
+      const pivot = new THREE.Group();
+      pivot.position.set(c.x, wheelR, c.z);
+      const wm = new THREE.Mesh(wheelGeo, tireMat);
+      wm.castShadow = true;
+      pivot.add(wm);
+      this.chassis.add(pivot);
+      this.wheels.push(wm);
+      if (c.front) this.frontPivots.push(pivot);
+      else this.rearWheelPositions.push(new THREE.Vector3(c.x, 0.15, c.z));
+    }
+  }
+// Note: Add VEHICLE_TYPES to the import from './config.js' in car.js.
 
   reset(x = 0, z = 0, heading = 0) {
     this.speed = 0;

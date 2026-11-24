@@ -320,3 +320,29 @@ export const DISTRICTS = {
   airport: 'airport',
   industrial: 'industrial'
 };
+/* === PHASE 5 ADDITIONS (Gemini) === */
+export const TRAIN = {
+  carCount: 4,
+  carLength: 9,
+  speed: 18,
+  stationRadius: 16,
+  fare: 60
+};
+
+export const TAXI = {
+  fareBase: 35,
+  farePerMeter: 0.5,
+  pickupRadius: 8,
+  dropoffRadius: 10
+};
+
+export const SHOP = {
+  prices: {
+    bike: 400,
+    coupe: 900,
+    muscle: 1400,
+    supercar: 2200,
+    bus: 1800
+  },
+  stock: ['bike', 'coupe', 'muscle', 'supercar', 'bus']
+};

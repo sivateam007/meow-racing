@@ -598,3 +598,76 @@ body {
     font-size: 11px;
   }
 }
+/* === PHASE 5 TAXI / SHOP / TRAIN (Gemini) === */
+.hud-taxi-chip {
+  background: rgba(15, 23, 42, 0.78);
+  border: 1.5px solid rgba(250, 204, 21, 0.4);
+  color: #fde047;
+}
+
+.hud-taxi-chip.active {
+  background: linear-gradient(180deg, rgba(250, 204, 21, 0.45) 0%, rgba(202, 138, 4, 0.65) 100%);
+  border-color: #fef08a;
+  color: #ffffff;
+}
+
+.station-marker-label {
+  position: fixed;
+  top: 120px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  color: #bae6fd;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  pointer-events: none;
+  z-index: 22;
+}
+
+.shop-panel-vehicles {
+  position: fixed;
+  left: 50%;
+  bottom: 96px;
+  transform: translateX(-50%);
+  z-index: 35;
+  padding: 12px 16px;
+  border-radius: 18px;
+  background: rgba(10, 15, 32, 0.9);
+  border: 1.5px solid rgba(0, 245, 212, 0.45);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.6);
+}
+
+.shop-panel-vehicles.hidden {
+  display: none !important;
+}
+
+.shop-panel-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 900;
+  color: #00f5d4;
+}
+
+.shop-panel-vehicles button {
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(30, 41, 59, 0.9);
+  color: #f8fafc;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.shop-panel-vehicles button:active {
+  transform: scale(0.95);
+  border-color: #00f5d4;
+}

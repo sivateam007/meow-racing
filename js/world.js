@@ -8,6 +8,7 @@ import {
   TERRAIN,
   RACE,
   FUEL,
+  TRAIN,
   COLORS,
   clamp,
   lerp,
@@ -299,6 +300,9 @@ export class World {
     this._buildGreenDistricts();
     this._buildDesertAirport();
     this._buildFuelStation();
+    this._buildRailway();
+    this._buildTrain();
+    this._buildVehicleShop();
   }
 
   _buildSkyline() {
@@ -877,6 +881,8 @@ export class World {
     this._updateDayNight(safeDt);
     this._updatePolice(safeDt, playerPos, wantedLevel || 0);
     this._updateFuelStation(safeDt, playerPos);
+    this._updateTrain(safeDt);
+    this._updateTaxiMarker(safeDt);
   }
 
   _buildOilDistrict() {
@@ -1653,6 +1659,311 @@ _buildGreenDistricts() {
       }
     }
   }
+
+_buildRailway() {
+    if (!this.scene) return;
+    if (!this.railwayGroup) {
+      this.railwayGroup = new THREE.Group();
+      this.scene.add(this.railwayGroup);
+    }
+    this.railwayGroup.clear();
+
+    const halfSpan = WORLD_CFG.halfSpan || 260;
+    const trackLen = halfSpan * 2.1;
+    this.railZ = halfSpan * 0.55;
+
+    const railMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.3, metalness: 0.85 });
+    const sleeperMat = new THREE.MeshStandardMaterial({ color: 0x451a03, roughness: 0.9 });
+    const platMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.75 });
+    const roofMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5, metalness: 0.4 });
+    const benchMat = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.65 });
+
+    for (const rOff of [-0.75, 0.75]) {
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(trackLen, 0.18, 0.14), railMat);
+      rail.position.set(0, 0.16, this.railZ + rOff);
+      this.railwayGroup.add(rail);
+    }
+
+    const sleeperGeo = new THREE.BoxGeometry(0.32, 0.1, 2.2);
+    for (let x = -halfSpan; x <= halfSpan; x += 2.2) {
+      const sleeper = new THREE.Mesh(sleeperGeo, sleeperMat);
+      sleeper.position.set(x, 0.06, this.railZ);
+      this.railwayGroup.add(sleeper);
+    }
+
+    const platX = 0;
+    const platZ = this.railZ + 4.2;
+    const platform = new THREE.Mesh(new THREE.BoxGeometry(28, 0.9, 5.2), platMat);
+    platform.position.set(platX, 0.45, platZ);
+    platform.castShadow = true;
+    platform.receiveShadow = true;
+    this.railwayGroup.add(platform);
+
+    const canopy = new THREE.Mesh(new THREE.BoxGeometry(22, 0.4, 4.2), roofMat);
+    canopy.position.set(platX, 4.4, platZ);
+    canopy.castShadow = true;
+    this.railwayGroup.add(canopy);
+
+    for (const px of [-8, 0, 8]) {
+      const pillar = new THREE.Mesh(new THREE.BoxGeometry(0.35, 3.5, 0.35), roofMat);
+      pillar.position.set(platX + px, 2.65, platZ);
+      this.railwayGroup.add(pillar);
+    }
+
+    const bench = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.55, 0.8), benchMat);
+    bench.position.set(platX - 4, 1.18, platZ + 0.8);
+    this.railwayGroup.add(bench);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 96;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(0, 0, 512, 96);
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 6;
+    ctx.strokeRect(4, 4, 504, 88);
+    ctx.fillStyle = '#f8fafc';
+    ctx.font = '900 34px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('CENTRAL STATION', 256, 50);
+
+    const signTex = new THREE.CanvasTexture(canvas);
+    signTex.colorSpace = THREE.SRGBColorSpace;
+    const sign = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 2.2),
+      new THREE.MeshBasicMaterial({ map: signTex, side: THREE.DoubleSide })
+    );
+    sign.position.set(platX, 5.8, platZ);
+    this.railwayGroup.add(sign);
+  }
+
+  _buildTrain() {
+    if (!this.scene) return;
+    if (!this.trainGroup) {
+      this.trainGroup = new THREE.Group();
+      this.scene.add(this.trainGroup);
+    }
+    this.trainGroup.clear();
+    this.trainCars = [];
+
+    const count = (typeof TRAIN !== 'undefined' && TRAIN.carCount) || 4;
+    const carLen = (typeof TRAIN !== 'undefined' && TRAIN.carLength) || 9;
+    const halfSpan = WORLD_CFG.halfSpan || 260;
+    this.trainX = -halfSpan + 20;
+
+    const locoMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.35, metalness: 0.5 });
+    const coachMat = new THREE.MeshStandardMaterial({ color: 0x2563eb, roughness: 0.35, metalness: 0.4 });
+    const winMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
+    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.8 });
+    const noseMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.4, metalness: 0.5 });
+
+    const wheelGeo = new THREE.CylinderGeometry(0.45, 0.45, 0.3, 12);
+    wheelGeo.rotateZ(Math.PI * 0.5);
+
+    for (let i = 0; i < count; i++) {
+      const isEngine = i === 0;
+      const carGrp = new THREE.Group();
+      const body = new THREE.Mesh(
+        new THREE.BoxGeometry(2.6, 2.5, carLen),
+        isEngine ? locoMat : coachMat
+      );
+      body.position.y = 1.45;
+      body.castShadow = true;
+      carGrp.add(body);
+
+      const roof = new THREE.Mesh(new THREE.BoxGeometry(2.7, 0.25, carLen * 0.96), noseMat);
+      roof.position.y = 2.8;
+      carGrp.add(roof);
+
+      const winGeo = new THREE.BoxGeometry(2.66, 0.65, 1.3);
+      for (const wz of [-2.4, 0, 2.4]) {
+        const win = new THREE.Mesh(winGeo, winMat);
+        win.position.set(0, 1.85, wz);
+        carGrp.add(win);
+      }
+
+      if (isEngine) {
+        const nose = new THREE.Mesh(new THREE.ConeGeometry(1.45, 2.4, 4), noseMat);
+        nose.rotation.x = Math.PI * 0.5;
+        nose.rotation.z = Math.PI * 0.25;
+        nose.position.set(0, 1.35, carLen * 0.5 + 1.0);
+        carGrp.add(nose);
+
+        const light = new THREE.Mesh(
+          new THREE.SphereGeometry(0.32, 8, 8),
+          new THREE.MeshBasicMaterial({ color: 0xffffff })
+        );
+        light.position.set(0, 1.75, carLen * 0.5 + 1.8);
+        carGrp.add(light);
+      }
+
+      const wheels = [];
+      for (const wx of [-1.2, 1.2]) {
+        for (const wz of [-carLen * 0.32, carLen * 0.32]) {
+          const wm = new THREE.Mesh(wheelGeo, wheelMat);
+          wm.position.set(wx, 0.45, wz);
+          carGrp.add(wm);
+          wheels.push(wm);
+        }
+      }
+
+      this.trainGroup.add(carGrp);
+      this.trainCars.push({ group: carGrp, wheels, index: i });
+    }
+  }
+
+  _updateTrain(dt) {
+    if (!Array.isArray(this.trainCars) || this.trainCars.length === 0) return;
+    const safeDt = Math.min(dt, 0.05);
+    const speed = (typeof TRAIN !== 'undefined' && TRAIN.speed) || 18;
+    const carLen = (typeof TRAIN !== 'undefined' && TRAIN.carLength) || 9;
+    const halfSpan = WORLD_CFG.halfSpan || 260;
+    const railZ = typeof this.railZ === 'number' ? this.railZ : halfSpan * 0.55;
+
+    this.trainX = (typeof this.trainX === 'number' ? this.trainX : -halfSpan) + speed * safeDt;
+    if (this.trainX > halfSpan + carLen * 2) {
+      this.trainX = -halfSpan - carLen * 2;
+    }
+
+    const wheelDelta = (speed * safeDt) / 0.45;
+    for (let i = 0; i < this.trainCars.length; i++) {
+      const tc = this.trainCars[i];
+      tc.group.position.set(this.trainX - i * (carLen + 0.6), 0.2, railZ);
+      for (let w = 0; w < tc.wheels.length; w++) {
+        tc.wheels[w].rotation.x -= wheelDelta;
+      }
+    }
+  }
+
+  _buildVehicleShop() {
+    if (!this.scene) return;
+    if (!this.shopGroup) {
+      this.shopGroup = new THREE.Group();
+      this.scene.add(this.shopGroup);
+    }
+    this.shopGroup.clear();
+
+    const streets = Array.isArray(this.streetCoords) && this.streetCoords.length > 0 ? this.streetCoords : [0];
+    const idx = Math.min(streets.length - 1, Math.max(0, Math.floor(streets.length * 0.35)));
+    const sx = (streets[idx] || 0) + (WORLD_CFG.roadWidth || 14) * 0.5 + 11;
+    const sz = streets[idx] || 0;
+    this.shopPosition = { x: sx, z: sz };
+
+    const grp = new THREE.Group();
+    grp.position.set(sx, 0, sz);
+
+    const floorMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4, metalness: 0.3 });
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.6 });
+    const glassMat = new THREE.MeshStandardMaterial({
+      color: 0x7dd3fc,
+      transparent: true,
+      opacity: 0.32,
+      roughness: 0.1,
+      metalness: 0.8
+    });
+    const padMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.3, metalness: 0.6 });
+
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(20, 0.2, 14), floorMat);
+    floor.position.y = 0.1;
+    floor.receiveShadow = true;
+    grp.add(floor);
+
+    const backWall = new THREE.Mesh(new THREE.BoxGeometry(20, 4.5, 0.5), wallMat);
+    backWall.position.set(0, 2.25, -6.75);
+    backWall.castShadow = true;
+    grp.add(backWall);
+
+    const frontGlass = new THREE.Mesh(new THREE.BoxGeometry(19, 3.8, 0.2), glassMat);
+    frontGlass.position.set(0, 1.9, 6.75);
+    grp.add(frontGlass);
+
+    this.colliders.push({
+      minX: sx - 10.2,
+      maxX: sx + 10.2,
+      minZ: sz - 7.1,
+      maxZ: sz - 6.4
+    });
+
+    const displayTypes = ['sports', 'muscle', 'bike'];
+    displayTypes.forEach((tKey, i) => {
+      const px = -5.5 + i * 5.5;
+      const pz = 0.5;
+      const pedestal = new THREE.Mesh(new THREE.CylinderGeometry(1.8, 2.0, 0.25, 16), padMat);
+      pedestal.position.set(px, 0.32, pz);
+      grp.add(pedestal);
+
+      if (typeof this._createVehicleMesh === 'function') {
+        const built = this._createVehicleMesh(tKey, 0xfacc15);
+        const disp = built && built.group ? built.group : built;
+        if (disp && disp.position) {
+          disp.position.set(px, 0.45, pz);
+          disp.rotation.y = 0.55;
+          grp.add(disp);
+        }
+      }
+    });
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 96;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#090d1a';
+    ctx.fillRect(0, 0, 512, 96);
+    ctx.strokeStyle = '#00f5d4';
+    ctx.lineWidth = 6;
+    ctx.strokeRect(4, 4, 504, 88);
+    ctx.fillStyle = '#00f5d4';
+    ctx.font = '900 36px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('CITY MOTORS', 256, 50);
+
+    const signTex = new THREE.CanvasTexture(canvas);
+    signTex.colorSpace = THREE.SRGBColorSpace;
+    const sign = new THREE.Mesh(
+      new THREE.PlaneGeometry(11, 2.1),
+      new THREE.MeshBasicMaterial({ map: signTex, side: THREE.DoubleSide })
+    );
+    sign.position.set(0, 5.4, 6.85);
+    grp.add(sign);
+
+    this.scene.add(grp);
+  }
+
+  _updateTaxiMarker(dt) {
+    if (!this.scene) return;
+    const safeDt = Math.min(dt, 0.05);
+
+    if (!this.taxiTarget) {
+      if (this.taxiMarker) {
+        this.taxiMarker.visible = false;
+      }
+      return;
+    }
+
+    if (!this.taxiMarker) {
+      const geo = new THREE.CylinderGeometry(3.2, 3.2, 2.6, 20, 1, true);
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0xfacc15,
+        transparent: true,
+        opacity: 0.45,
+        side: THREE.DoubleSide,
+        depthWrite: false
+      });
+      this.taxiMarker = new THREE.Mesh(geo, mat);
+      this.scene.add(this.taxiMarker);
+    }
+
+    this.taxiMarker.visible = true;
+    this.taxiMarker.position.set(this.taxiTarget.x || 0, 1.35, this.taxiTarget.z || 0);
+    this.taxiMarker.rotation.y += safeDt * 2.2;
+    if (this.taxiMarker.material) {
+      this.taxiMarker.material.opacity = 0.35 + 0.2 * Math.sin((this.time || 0) * 6);
+    }
+  }
+// Note: Call this._buildRailway(), this._buildTrain(), and this._buildVehicleShop() at the end of buildCity(); call this._updateTrain(dt) and this._updateTaxiMarker(dt) inside update().
 
   getColliders() {
     return this.colliders;

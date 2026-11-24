@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import anime from 'animejs';
-import { WORLD_CFG, CAR_CFG, COLORS, INPUT, SURVIVAL, FUEL, clamp } from './config.js';
+import { WORLD_CFG, CAR_CFG, COLORS, INPUT, SURVIVAL, FUEL, TRAIN, TAXI, SHOP, clamp } from './config.js';
 import Car from './car.js';
 import World from './world.js';
 import Effects from './effects.js';
@@ -121,7 +121,19 @@ export class Game {
       if (allMappedCodes.has(e.code)) {
         e.preventDefault();
       }
+      const wasDown = this.keys.has(e.code);
       this.keys.add(e.code);
+      if (wasDown) return;
+      if (e.code === 'KeyT') {
+        this.taxiMode = !this.taxiMode;
+        if (!this.taxiMode) {
+          this.taxiPassenger = null;
+          if (this.world) this.world.taxiTarget = null;
+        }
+      } else if (e.code === 'KeyB') {
+        const panel = document.getElementById('shop-panel-vehicles');
+        if (panel) panel.classList.toggle('hidden');
+      }
     });
 
     window.addEventListener('keyup', (e) => {
@@ -179,10 +191,42 @@ export class Game {
         this.startGame();
       });
     }
+
+    document.querySelectorAll('[data-vehicle]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const vType = btn.getAttribute('data-vehicle');
+        if (!vType || !SHOP || !SHOP.prices) return;
+        const price = SHOP.prices[vType] ?? 500;
+        if (!this.ownedVehicles) this.ownedVehicles = ['sedan'];
+        if (!this.ownedVehicles.includes(vType)) {
+          if ((this.coins || 0) < price) return;
+          this.coins -= price;
+          this.ownedVehicles.push(vType);
+          try {
+            localStorage.setItem('meow_open_city_vehicles', JSON.stringify(this.ownedVehicles));
+          } catch (_) {}
+        }
+        this.currentVehicle = vType;
+        if (this.car && typeof this.car.setVehicleType === 'function') {
+          this.car.setVehicleType(vType);
+        }
+        this._updateHud();
+      });
+    });
   }
 
   startGame() {
     this.state = 'play';
+    this.taxiMode = false;
+    this.taxiPassenger = null;
+    this.taxiEarnings = 0;
+    this.currentVehicle = this.currentVehicle || 'sedan';
+    try {
+      const saved = JSON.parse(localStorage.getItem('meow_open_city_vehicles') || '["sedan"]');
+      this.ownedVehicles = Array.isArray(saved) && saved.length > 0 ? saved : ['sedan'];
+    } catch (_) {
+      this.ownedVehicles = ['sedan'];
+    }
     if (typeof FUEL !== 'undefined') this.fuel = FUEL.startAmount ?? FUEL.max ?? 100;
     if (this.world && typeof this.world._startStreetRace === 'function') {
       this.world._startStreetRace(this.car.getPosition());
@@ -357,6 +401,15 @@ export class Game {
   }
 
   _updateHud() {
+    const taxiEl = document.getElementById('hud-taxi');
+    if (taxiEl) {
+      taxiEl.textContent = this.taxiMode ? (this.taxiPassenger ? 'TAXI: FARE' : 'TAXI: ON') : 'TAXI: OFF';
+      taxiEl.classList.toggle('active', Boolean(this.taxiMode));
+    }
+    const mEl0 = document.getElementById('hud-mission');
+    if (mEl0 && this.taxiMode) {
+      mEl0.textContent = this.taxiPassenger ? 'TAXI: DROP PASSENGER AT MARKER' : 'TAXI: DRIVE NEAR PEDESTRIAN';
+    }
     const fuelEl = document.getElementById('hud-fuel');
     if (fuelEl) {
       const maxFuel = (typeof FUEL !== 'undefined' && FUEL.max) || 100;
@@ -466,6 +519,41 @@ export class Game {
 
     const carPos = this.car.getPosition();
     this.world.update(dt, carPos, this.wanted || 0);
+
+    if (this.state === 'play' && this.taxiMode && typeof TAXI !== 'undefined') {
+      const pPos = this.car.getPosition();
+      if (!this.taxiPassenger && this.world && Array.isArray(this.world.pedPool)) {
+        for (let i = 0; i < this.world.pedPool.length; i++) {
+          const ped = this.world.pedPool[i];
+          if (!ped || !ped.root) continue;
+          const d = Math.hypot(pPos.x - ped.root.position.x, pPos.z - ped.root.position.z);
+          if (d <= (TAXI.pickupRadius || 8)) {
+            this.taxiPassenger = ped;
+            const streets = this.world.streetCoords || [0];
+            const tx = streets[Math.floor(Math.random() * streets.length)] || 0;
+            const tz = streets[Math.floor(Math.random() * streets.length)] || 0;
+            this.taxiPickupPos = { x: pPos.x, z: pPos.z };
+            this.taxiTarget = { x: tx, z: tz };
+            if (this.world) this.world.taxiTarget = this.taxiTarget;
+            break;
+          }
+        }
+      } else if (this.taxiPassenger && this.taxiTarget) {
+        const dDrop = Math.hypot(pPos.x - this.taxiTarget.x, pPos.z - this.taxiTarget.z);
+        if (dDrop <= (TAXI.dropoffRadius || 10)) {
+          const tripDist = Math.hypot(
+            this.taxiTarget.x - (this.taxiPickupPos ? this.taxiPickupPos.x : pPos.x),
+            this.taxiTarget.z - (this.taxiPickupPos ? this.taxiPickupPos.z : pPos.z)
+          );
+          const fare = Math.round((TAXI.fareBase || 35) + tripDist * (TAXI.farePerMeter || 0.5));
+          this.coins = (this.coins || 0) + fare;
+          this.taxiEarnings = (this.taxiEarnings || 0) + fare;
+          this.taxiPassenger = null;
+          this.taxiTarget = null;
+          if (this.world) this.world.taxiTarget = null;
+        }
+      }
+    }
 
     if (this.state === 'play' && typeof FUEL !== 'undefined') {
       const maxFuel = FUEL.max || 100;
