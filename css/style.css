@@ -507,3 +507,79 @@ body {
   border: 1px solid rgba(251, 191, 36, 0.5);
   color: #fde68a;
 }
+/* === PHASE 3 LANDSCAPE / NIGHT (Gemini) === */
+.rotate-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(5, 8, 22, 0.94);
+  backdrop-filter: blur(10px);
+}
+
+.rotate-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 28px 32px;
+  border-radius: 22px;
+  background: rgba(15, 23, 42, 0.92);
+  border: 2px solid rgba(34, 211, 238, 0.5);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.65);
+}
+
+.rotate-icon {
+  font-size: 46px;
+  color: #22d3ee;
+  text-shadow: 0 0 18px rgba(34, 211, 238, 0.65);
+}
+
+.rotate-text {
+  font-style: italic;
+  font-weight: 900;
+  font-size: 18px;
+  letter-spacing: 0.08em;
+  color: #f8fafc;
+}
+
+.night-emissive-glow {
+  box-shadow: 0 0 18px rgba(253, 224, 71, 0.45), 0 0 28px rgba(56, 189, 248, 0.3);
+}
+
+@media (orientation: landscape) and (max-height: 520px) {
+  .touch-group-left {
+    left: 16px;
+    bottom: 14px;
+    gap: 12px;
+  }
+
+  .touch-group-right {
+    right: 16px;
+    bottom: 14px;
+    gap: 12px;
+  }
+
+  .touch-btn {
+    width: 68px;
+    height: 68px;
+    min-width: 66px;
+    min-height: 66px;
+    font-size: 12px;
+  }
+
+  #touch-drift,
+  #touch-turbo {
+    position: fixed;
+    right: 16px;
+    bottom: 92px;
+    width: 72px;
+    height: 72px;
+  }
+
+  #touch-drift {
+    right: 98px;
+  }
+}

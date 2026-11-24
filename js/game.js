@@ -102,6 +102,11 @@ export class Game {
       this.camera.aspect = w / h;
       this.camera.updateProjectionMatrix();
       this.renderer.setSize(w, h);
+      const rotEl = document.getElementById('rotate-overlay');
+      if (rotEl) {
+        const isPortraitPhone = h > w && Boolean(this.isTouch || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches));
+        rotEl.style.display = isPortraitPhone ? 'flex' : 'none';
+      }
     });
 
     const allMappedCodes = new Set([
@@ -178,6 +183,9 @@ export class Game {
 
   startGame() {
     this.state = 'play';
+    if (this.world && typeof this.world._startStreetRace === 'function') {
+      this.world._startStreetRace(this.car.getPosition());
+    }
     if (this.menuOverlay) {
       this.menuOverlay.style.display = 'none';
       this.menuOverlay.classList.add('hidden');
@@ -310,7 +318,7 @@ export class Game {
     if (this.health <= 0) {
       this.health = SURVIVAL.maxHealth;
       this.wanted = 0;
-      this.car.reset(0, 0, 0);
+      this.car.reset(29, 29, 0);
     }
   }
 
@@ -348,6 +356,16 @@ export class Game {
   }
 
   _updateHud() {
+    const missionEl = document.getElementById('hud-mission');
+    if (missionEl && this.world) {
+      if (this.world.raceActive) {
+        const cpNum = Math.min((this.world.raceIndex || 0) + 1, (this.world.raceCheckpoints && this.world.raceCheckpoints.length) || 3);
+        const cpTotal = (this.world.raceCheckpoints && this.world.raceCheckpoints.length) || 3;
+        missionEl.textContent = `RACE CP ${cpNum}/${cpTotal} • ${Math.ceil(this.world.raceTime || 0)}s`;
+      } else {
+        missionEl.textContent = 'MISSION: VISIT OIL CO';
+      }
+    }
     const hpFill = document.getElementById('hud-health-fill');
     if (hpFill) {
       const hpPct = Math.max(0, Math.min(100, ((this.health ?? SURVIVAL.maxHealth) / SURVIVAL.maxHealth) * 100));
@@ -441,6 +459,18 @@ export class Game {
 
     const carPos = this.car.getPosition();
     this.world.update(dt, carPos, this.wanted || 0);
+
+    const raceReward = this.world && typeof this.world._updateStreetRace === 'function'
+      ? this.world._updateStreetRace(dt, carPos)
+      : 0;
+    if (raceReward > 0) {
+      const prevCoins = this.coins || 0;
+      this.coins = prevCoins + raceReward;
+      this.displayedCoins = this.coins;
+      if (this.effects && typeof this.effects.tweenCounter === 'function' && this.coinsEl) {
+        this.effects.tweenCounter(this.coinsEl, prevCoins, this.coins, 450);
+      }
+    }
 
     const speedFactor = clamp(Math.abs(this.car.speed) / Math.max(1, CAR_CFG.maxSpeed), 0, 1);
     this.effects.update(dt, this.car, speedFactor);

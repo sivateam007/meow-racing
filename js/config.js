@@ -25,7 +25,7 @@ export const COLORS = {
 };
 
 export const WORLD_CFG = {
-  blocksPerSide: 6,
+  blocksPerSide: 9,
   blockSize: 44,
   roadWidth: 14,
   laneOffset: 3.4,
@@ -257,7 +257,10 @@ export const VEHICLE_TYPES = {
     speedMax: 32,
     spawnWeight: 0,
     colors: [0x0f172a, 0x1e293b]
-  }
+  },
+  coupe: { label: 'Coupe', w: 1.96, h: 1.12, l: 4.15, speedMin: 20, speedMax: 29, spawnWeight: 14, colors: [0xf43f5e, 0x38bdf8, 0xfacc15, 0xa855f7] },
+  muscle: { label: 'Muscle', w: 2.08, h: 1.18, l: 4.55, speedMin: 22, speedMax: 32, spawnWeight: 12, colors: [0xf97316, 0x1e293b, 0xdc2626, 0xfbbf24] },
+  supercar: { label: 'Supercar', w: 2.12, h: 0.94, l: 4.45, speedMin: 27, speedMax: 38, spawnWeight: 8, colors: [0x00f5d4, 0xff2a85, 0xfef08a, 0x2563eb] }
 };
 
 export const SURVIVAL = {
@@ -274,3 +277,29 @@ export const MISSION = {
   targetDistance: 240,
   reward: 150
 };
+/* === PHASE 3 ADDITIONS (Gemini) === */
+// Note: In WORLD_CFG, change `blocksPerSide: 6` to `blocksPerSide: 9`.
+
+export const TERRAIN = {
+  hillCount: 14,
+  mountainRingMin: 230,
+  mountainRingMax: 360,
+  bridgeCount: 6,
+  bridgeHeight: 9,
+  bridgeWidth: 14,
+  rampLength: 36
+};
+
+export const RACE = {
+  checkpoints: 3,
+  timeLimit: 90,
+  reward: 400,
+  radius: 12
+};
+
+export const PED_STYLES = ['casual', 'business', 'runner', 'skater', 'tourist'];
+
+// Add inside VEHICLE_TYPES:
+// coupe: { label: 'Coupe', w: 1.96, h: 1.12, l: 4.15, speedMin: 20, speedMax: 29, spawnWeight: 14, colors: [0xf43f5e, 0x38bdf8, 0xfacc15, 0xa855f7] },
+// muscle: { label: 'Muscle', w: 2.08, h: 1.18, l: 4.55, speedMin: 22, speedMax: 32, spawnWeight: 12, colors: [0xf97316, 0x1e293b, 0xdc2626, 0xfbbf24] },
+// supercar: { label: 'Supercar', w: 2.12, h: 0.94, l: 4.45, speedMin: 27, speedMax: 38, spawnWeight: 8, colors: [0x00f5d4, 0xff2a85, 0xfef08a, 0x2563eb] },

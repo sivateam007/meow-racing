@@ -24,7 +24,7 @@ export class Car {
     this._buildModel();
     this.setSkin(initialSkinId);
     this.scene.add(this.group);
-    this.reset(0, 0, 0);
+    this.reset(29, 29, 0);
   }
 
   _buildModel() {

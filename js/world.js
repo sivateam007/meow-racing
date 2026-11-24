@@ -5,6 +5,8 @@ import {
   PED_CFG,
   VEHICLE_TYPES,
   SURVIVAL,
+  TERRAIN,
+  RACE,
   COLORS,
   clamp,
   lerp,
@@ -291,6 +293,8 @@ export class World {
 
     this._buildSkyline();
     this._buildOilDistrict();
+    this._buildTerrain();
+    this._buildBridges();
   }
 
   _buildSkyline() {
@@ -993,6 +997,204 @@ export class World {
       pos.z = clamp(pos.z - Math.cos(cop.heading) * cop.speed * safeDt, -spanLimit, spanLimit);
       cop.mesh.rotation.y = cop.heading;
     }
+  }
+
+_buildTerrain() {
+    if (!this.terrainGroup) {
+      this.terrainGroup = new THREE.Group();
+      this.scene.add(this.terrainGroup);
+    }
+    this.terrainGroup.clear();
+
+    const hillMat = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.9, metalness: 0.05 });
+    const peakMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.85, metalness: 0.1 });
+    const snowMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.6, metalness: 0.05 });
+
+    const hillCount = (typeof TERRAIN !== 'undefined' && TERRAIN.hillCount) || 14;
+    const minR = (typeof TERRAIN !== 'undefined' && TERRAIN.mountainRingMin) || 230;
+    const maxR = (typeof TERRAIN !== 'undefined' && TERRAIN.mountainRingMax) || 360;
+
+    for (let i = 0; i < hillCount; i++) {
+      const radius = randRange(12, 24);
+      const height = randRange(5, 13);
+      const hill = new THREE.Mesh(new THREE.ConeGeometry(radius, height, 7), hillMat);
+      const side = i % 2 === 0 ? -1 : 1;
+      const hx = side * (WORLD_CFG.halfSpan + randRange(18, 52));
+      const hz = randRange(-WORLD_CFG.halfSpan * 0.9, WORLD_CFG.halfSpan * 0.9);
+      hill.position.set(hx, height * 0.45, hz);
+      this.terrainGroup.add(hill);
+    }
+
+    const mtnCount = 24;
+    for (let i = 0; i < mtnCount; i++) {
+      const angle = (i / mtnCount) * Math.PI * 2 + randRange(-0.08, 0.08);
+      const dist = randRange(minR, maxR);
+      const baseRad = randRange(24, 44);
+      const mtnH = randRange(48, 96);
+      const mx = Math.cos(angle) * dist;
+      const mz = Math.sin(angle) * dist;
+
+      const mtn = new THREE.Mesh(new THREE.ConeGeometry(baseRad, mtnH, 6), peakMat);
+      mtn.position.set(mx, mtnH * 0.45 - 2, mz);
+      mtn.rotation.y = randRange(0, Math.PI);
+      this.terrainGroup.add(mtn);
+
+      const capH = mtnH * 0.24;
+      const cap = new THREE.Mesh(new THREE.ConeGeometry(baseRad * 0.28, capH, 6), snowMat);
+      cap.position.set(mx, mtnH * 0.45 - 2 + mtnH * 0.5 - capH * 0.5, mz);
+      cap.rotation.y = mtn.rotation.y;
+      this.terrainGroup.add(cap);
+
+      this.colliders.push({
+        minX: mx - baseRad * 0.65,
+        maxX: mx + baseRad * 0.65,
+        minZ: mz - baseRad * 0.65,
+        maxZ: mz + baseRad * 0.65
+      });
+    }
+  }
+
+  _buildBridges() {
+    if (!this.bridgeGroup) {
+      this.bridgeGroup = new THREE.Group();
+      this.scene.add(this.bridgeGroup);
+    }
+    this.bridgeGroup.clear();
+
+    const count = (typeof TERRAIN !== 'undefined' && TERRAIN.bridgeCount) || 6;
+    const deckH = (typeof TERRAIN !== 'undefined' && TERRAIN.bridgeHeight) || 9;
+    const bridgeW = (typeof TERRAIN !== 'undefined' && TERRAIN.bridgeWidth) || 14;
+    const rampLen = (typeof TERRAIN !== 'undefined' && TERRAIN.rampLength) || 36;
+    const deckLen = WORLD_CFG.blockSize + WORLD_CFG.roadWidth;
+
+    const deckMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.75, metalness: 0.2 });
+    const railMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.4, metalness: 0.6 });
+    const pillarMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.85 });
+
+    const streets = this.streetCoords && this.streetCoords.length > 1 ? this.streetCoords : [-80, 0, 80];
+
+    for (let i = 0; i < count; i++) {
+      const horizontal = i % 2 === 0;
+      const fixedCoord = streets[i % streets.length];
+      const spanCoord = streets[(i + 1) % streets.length] * 0.5 + streets[i % streets.length] * 0.5;
+
+      const bridge = new THREE.Group();
+      const deck = new THREE.Mesh(new THREE.BoxGeometry(bridgeW, 0.5, deckLen), deckMat);
+      deck.position.y = deckH;
+      deck.castShadow = true;
+      deck.receiveShadow = true;
+      bridge.add(deck);
+
+      const rampAngle = Math.atan2(deckH, rampLen);
+      const rampHyp = Math.hypot(deckH, rampLen);
+      for (const dir of [-1, 1]) {
+        const ramp = new THREE.Mesh(new THREE.BoxGeometry(bridgeW, 0.45, rampHyp), deckMat);
+        ramp.position.set(0, deckH * 0.5, dir * (deckLen * 0.5 + rampLen * 0.5));
+        ramp.rotation.x = dir * rampAngle;
+        ramp.receiveShadow = true;
+        bridge.add(ramp);
+      }
+
+      for (const side of [-1, 1]) {
+        const rail = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.9, deckLen), railMat);
+        rail.position.set(side * (bridgeW * 0.5 - 0.2), deckH + 0.65, 0);
+        bridge.add(rail);
+
+        const pillar = new THREE.Mesh(new THREE.BoxGeometry(1.1, deckH, 1.1), pillarMat);
+        pillar.position.set(side * (bridgeW * 0.36), deckH * 0.5, 0);
+        pillar.castShadow = true;
+        bridge.add(pillar);
+      }
+
+      if (horizontal) {
+        bridge.rotation.y = Math.PI * 0.5;
+        bridge.position.set(spanCoord, 0, fixedCoord);
+      } else {
+        bridge.position.set(fixedCoord, 0, spanCoord);
+      }
+
+      this.bridgeGroup.add(bridge);
+    }
+  }
+
+  _startStreetRace(playerPos = { x: 0, z: 0 }) {
+    if (!this.raceGroup) {
+      this.raceGroup = new THREE.Group();
+      this.scene.add(this.raceGroup);
+    }
+    this.raceGroup.clear();
+
+    const total = (typeof RACE !== 'undefined' && RACE.checkpoints) || 3;
+    const radius = (typeof RACE !== 'undefined' && RACE.radius) || 12;
+    this.raceCheckpoints = [];
+    this.raceIndex = 0;
+    this.raceTime = (typeof RACE !== 'undefined' && RACE.timeLimit) || 90;
+    this.raceActive = true;
+
+    const ringGeo = new THREE.TorusGeometry(radius * 0.55, 0.45, 10, 28);
+    const activeMat = new THREE.MeshBasicMaterial({ color: 0x00f5d4 });
+    const idleMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
+
+    const px = playerPos.x || 0;
+    const pz = playerPos.z || 0;
+    const limit = WORLD_CFG.halfSpan - 16;
+
+    for (let i = 0; i < total; i++) {
+      const angle = ((i + 1) / total) * Math.PI * 1.4 - Math.PI * 0.7;
+      const dist = 85 + i * 75;
+      const cx = clamp(px + Math.sin(angle) * dist, -limit, limit);
+      const cz = clamp(pz - Math.cos(angle) * dist, -limit, limit);
+
+      const mesh = new THREE.Mesh(ringGeo, i === 0 ? activeMat : idleMat);
+      mesh.position.set(cx, 5.2, cz);
+      mesh.visible = i === 0;
+      this.raceGroup.add(mesh);
+
+      this.raceCheckpoints.push({ x: cx, z: cz, mesh, activeMat, idleMat });
+    }
+  }
+
+  _updateStreetRace(dt, playerPos = { x: 0, z: 0 }) {
+    if (!this.raceActive || !Array.isArray(this.raceCheckpoints) || this.raceCheckpoints.length === 0) {
+      return 0;
+    }
+
+    const safeDt = Math.min(dt, 0.05);
+    this.raceTime = Math.max(0, (this.raceTime || 0) - safeDt);
+    if (this.raceTime <= 0) {
+      this.raceActive = false;
+      if (this.raceGroup) this.raceGroup.clear();
+      return 0;
+    }
+
+    const current = this.raceCheckpoints[this.raceIndex];
+    if (!current) {
+      this.raceActive = false;
+      return 0;
+    }
+
+    current.mesh.rotation.y += safeDt * 1.8;
+    const dist = Math.hypot((playerPos.x || 0) - current.x, (playerPos.z || 0) - current.z);
+    const hitRadius = (typeof RACE !== 'undefined' && RACE.radius) || 12;
+
+    if (dist <= hitRadius) {
+      current.mesh.visible = false;
+      this.raceIndex += 1;
+
+      if (this.raceIndex >= this.raceCheckpoints.length) {
+        this.raceActive = false;
+        if (this.raceGroup) this.raceGroup.clear();
+        return (typeof RACE !== 'undefined' && RACE.reward) || 400;
+      }
+
+      const nextCp = this.raceCheckpoints[this.raceIndex];
+      if (nextCp && nextCp.mesh) {
+        nextCp.mesh.visible = true;
+        nextCp.mesh.material = nextCp.activeMat;
+      }
+    }
+
+    return 0;
   }
 
   getColliders() {
