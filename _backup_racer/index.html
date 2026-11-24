@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#2aa7e8" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <title>Meow Racing</title>
+  <link rel="stylesheet" href="css/style.css" />
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+      "cannon-es": "https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js",
+      "animejs": "https://cdn.jsdelivr.net/npm/animejs@3.2.2/lib/anime.es.js"
+    }
+  }
+  </script>
+</head>
+<body>
+  <canvas id="game-canvas"></canvas>
+
+  <!-- ================================ HUD ================================ -->
+  <div id="hud" class="hud">
+
+    <div class="hud-topleft">
+      <div class="counter counter-coin">
+        <span class="counter-icon coin-icon" aria-hidden="true">&#9679;</span>
+        <span id="hud-coins" class="counter-value">0</span>
+      </div>
+      <div class="counter counter-crown">
+        <span class="counter-icon crown-icon" aria-hidden="true">&#9818;</span>
+        <span id="hud-crowns" class="counter-value">0</span>
+      </div>
+    </div>
+
+    <div class="hud-topcenter">
+      <div id="hud-time-pill" class="time-pill">
+        <span class="time-icon" aria-hidden="true">&#9201;</span>
+        <span id="hud-time" class="time-value">60</span>
+      </div>
+      <div class="level-badge">
+        <span class="level-badge-label">LEVEL</span>
+        <span id="hud-level-num" class="level-badge-num">1</span>
+        <span id="hud-level-name" class="level-badge-name">Sunny Shores</span>
+      </div>
+    </div>
+
+    <div class="hud-topright">
+      <div class="stat stat-score">
+        <span class="stat-label">SCORE</span>
+        <span id="hud-score" class="stat-value">0</span>
+      </div>
+      <div class="stat stat-distance">
+        <span id="hud-distance" class="stat-value">0m</span>
+      </div>
+    </div>
+
+    <div class="hud-bottomleft">
+      <div id="hud-lives" class="lives"></div>
+    </div>
+
+    <div class="hud-bottomright">
+      <div class="top-speedo">
+        <div class="speedo-ring">
+          <div class="speedo-inner">
+            <span id="hud-speed-big" class="speedo-value">0</span>
+            <span class="speedo-unit">KM/H</span>
+          </div>
+        </div>
+        <div class="speedo-boost"><div class="speedo-boost-fill" id="hud-turbo-fill"></div></div>
+      </div>
+    </div>
+
+    <div class="touch-controls">
+      <div class="touch-left">
+        <button id="touch-left" class="touch-btn touch-steer" aria-label="Steer left">
+          <span>&#9664;</span>
+        </button>
+        <button id="touch-right" class="touch-btn touch-steer" aria-label="Steer right">
+          <span>&#9654;</span>
+        </button>
+      </div>
+      <div class="touch-right">
+        <button id="touch-brake" class="touch-btn touch-brake" aria-label="Brake">
+          <span>&#9660;</span>
+        </button>
+        <button id="touch-gas" class="touch-btn touch-gas" aria-label="Accelerate">
+          <span>&#9650;</span>
+        </button>
+        <button id="touch-turbo" class="touch-btn touch-turbo" aria-label="Boost">
+          <span>BOOST</span>
+        </button>
+        <button id="touch-drift" class="touch-btn touch-drift" aria-label="Drift">
+          <span>DRIFT</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Original-look HUD extras (Gemini) -->
+  <div id="hud-combo"></div>
+  <div id="desktop-hints">
+    <span>[A/D or Left/Right] Steer</span>
+    <span>[W/Up] Turbo</span>
+    <span>[Shift] Drift</span>
+    <span>[P] Pause</span>
+  </div>
+
+  <!-- ============================= POPUP LAYER ============================ -->
+  <div id="popup-layer" class="popup-layer"></div>
+
+  <!-- =============================== MENU ================================= -->
+  <div id="menu-overlay" class="overlay menu-overlay">
+    <div class="menu-wallet">
+      <div class="counter counter-coin menu-wallet-counter">
+        <span class="counter-icon coin-icon" aria-hidden="true">&#9679;</span>
+        <span id="menu-wallet-coins" class="counter-value">0</span>
+      </div>
+      <div class="counter counter-crown menu-wallet-counter">
+        <span class="counter-icon crown-icon" aria-hidden="true">&#9818;</span>
+        <span id="menu-wallet-crowns" class="counter-value">0</span>
+      </div>
+    </div>
+
+    <div class="menu-content">
+      <div class="logo">
+        <h1 class="logo-title">
+          <span class="logo-meow">MEOW</span>
+          <span class="logo-racing">RACING</span>
+        </h1>
+        <div class="logo-underline"></div>
+        <p class="logo-subtitle">Full Speed, Nine Lives</p>
+      </div>
+
+      <div class="menu-buttons">
+        <button id="go-button" class="go-button">
+          <span class="go-text">GO</span>
+          <span class="go-glow"></span>
+        </button>
+        <button id="shop-button" class="menu-secondary-button">
+          <span class="menu-secondary-icon">&#128722;</span>
+          <span>SHOP</span>
+        </button>
+      </div>
+
+      <div class="menu-hint">
+        <span class="hint-item"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> drive</span>
+        <span class="hint-item"><kbd>Space</kbd> boost</span>
+      </div>
+    </div>
+
+    <button id="help-button" class="corner-button corner-left" aria-label="Help">
+      <span class="corner-icon">?</span>
+    </button>
+    <button id="settings-button" class="corner-button corner-right" aria-label="Settings">
+      <span class="corner-icon">&#9881;</span>
+    </button>
+  </div>
+
+  <!-- ========================== LEVEL SELECT ============================== -->
+  <div id="level-select-overlay" class="overlay level-select-overlay">
+    <div class="level-select-card">
+      <h2 class="overlay-title level-select-title">SELECT LEVEL</h2>
+      <div id="level-select-grid" class="level-select-grid"></div>
+      <button id="level-select-close" class="primary-button level-select-close">BACK</button>
+    </div>
+  </div>
+
+  <!-- ============================== SHOP ================================== -->
+  <div id="shop-overlay" class="overlay shop-overlay">
+    <div id="shop-container" class="shop-container"></div>
+  </div>
+
+  <!-- =============================== PAUSE ================================= -->
+  <div id="pause-overlay" class="overlay pause-overlay" style="display:none">
+    <div class="overlay-card">
+      <h2 class="overlay-title">PAUSED</h2>
+      <p class="overlay-hint">Press <kbd>P</kbd> or <kbd>Esc</kbd> to resume</p>
+    </div>
+  </div>
+
+  <!-- =========================== GAME OVER ================================ -->
+  <div id="game-over-overlay" class="overlay game-over-overlay">
+    <div class="overlay-card">
+      <h2 class="overlay-title overlay-title-fail">GAME OVER</h2>
+      <p class="overlay-score-label">Final Score</p>
+      <p id="final-score" class="overlay-score">0</p>
+      <div class="overlay-buttons">
+        <button id="restart-button" class="primary-button">
+          <span>RETRY</span>
+        </button>
+        <button id="menu-button" class="secondary-button">
+          <span>MENU</span>
+        </button>
+      </div>
+      <p class="overlay-hint">Press <kbd>R</kbd> to restart</p>
+    </div>
+  </div>
+
+  <!-- =============================== WIN ================================== -->
+  <div id="win-overlay" class="overlay win-overlay">
+    <div class="overlay-card win-card">
+      <h2 class="overlay-title overlay-title-win">YOU WIN!</h2>
+      <p class="overlay-score-label">High Score</p>
+      <p id="win-score" class="overlay-score">0</p>
+      <p class="win-message">You conquered all 10 levels. MEOW!</p>
+      <button id="win-menu-button" class="primary-button win-button">
+        <span>MENU</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ============================== PRIZE ================================= -->
+  <div id="prize-overlay" class="overlay prize-overlay">
+    <div class="overlay-card prize-card">
+      <h2 class="overlay-title prize-title">LEVEL COMPLETE!</h2>
+      <div class="prize-rows">
+        <div class="prize-row">
+          <span class="prize-label">Coins earned</span>
+          <span id="prize-coins" class="prize-value prize-value-coin">0</span>
+        </div>
+        <div class="prize-row">
+          <span class="prize-label">Crowns</span>
+          <span id="prize-crowns" class="prize-value prize-value-crown">0</span>
+        </div>
+        <div class="prize-row">
+          <span class="prize-label">Distance bonus</span>
+          <span id="prize-distance" class="prize-value">0</span>
+        </div>
+        <div class="prize-row">
+          <span class="prize-label">Time bonus</span>
+          <span id="prize-time" class="prize-value">0</span>
+        </div>
+        <div class="prize-divider"></div>
+        <div class="prize-row prize-row-total">
+          <span class="prize-label-total">TOTAL</span>
+          <span id="prize-total" class="prize-value-total">0</span>
+        </div>
+      </div>
+      <button id="prize-claim-btn" class="primary-button prize-claim-button">
+        <span>CLAIM</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- =========================== HELP / SETTINGS ========================== -->
+  <div id="help-panel" class="panel">
+    <div class="panel-inner">
+      <h3 class="panel-title">How to Play</h3>
+      <ul class="panel-list">
+        <li><kbd>&#8592;</kbd><kbd>&#8594;</kbd> or <kbd>A</kbd><kbd>D</kbd> &mdash; Steer</li>
+        <li><kbd>&#8593;</kbd> or <kbd>W</kbd> &mdash; Accelerate</li>
+        <li><kbd>&#8595;</kbd> or <kbd>S</kbd> &mdash; Brake</li>
+        <li><kbd>Space</kbd> &mdash; Boost</li>
+        <li><kbd>Enter</kbd> &mdash; Start / Level select</li>
+        <li><kbd>R</kbd> &mdash; Retry level</li>
+      </ul>
+      <p class="panel-tip">Pass traffic for combo points, collect coins and crowns, grab blue boost pickups. Reach the target distance before time runs out to claim your prize and unlock the next level!</p>
+    </div>
+  </div>
+
+  <div id="settings-panel" class="panel">
+    <div class="panel-inner">
+      <h3 class="panel-title">Settings</h3>
+      <p class="panel-row">Quality: <strong>Auto</strong></p>
+      <p class="panel-row">Shadows: <strong>On</strong></p>
+      <p class="panel-row">Sound: <strong>On</strong></p>
+      <p class="panel-tip">For best performance, use a modern browser with WebGL. Progress is saved automatically to your device.</p>
+    </div>
+  </div>
+
+  <div id="level-complete-banner" class="level-complete-banner" aria-hidden="true"></div>
+
+  <script type="module" src="js/game.js"></script>
+</body>
+</html>

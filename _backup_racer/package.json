@@ -1,0 +1,17 @@
+{
+  "name": "meow-racing",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Meow Racing - 3D browser racing game (Three.js + cannon-es + anime.js), Express Web Service",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}

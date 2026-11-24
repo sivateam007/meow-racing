@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: meow-racing
+    env: node
+    plan: free
+    region: oregon
+    repo: https://github.com/sivateam007/meow-racing
+    branch: main
+    buildCommand: npm install
+    startCommand: node server.js
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "18"
