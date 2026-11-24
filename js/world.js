@@ -1054,66 +1054,190 @@ _buildTerrain() {
     }
   }
 
-  _buildBridges() {
+_buildBridges() {
     if (!this.bridgeGroup) {
       this.bridgeGroup = new THREE.Group();
       this.scene.add(this.bridgeGroup);
     }
     this.bridgeGroup.clear();
 
-    const count = (typeof TERRAIN !== 'undefined' && TERRAIN.bridgeCount) || 6;
+    const streets =
+      Array.isArray(this.streetCoords) && this.streetCoords.length >= 2
+        ? this.streetCoords
+        : [-203, -145, -87, -29, 29, 87, 145, 203];
+
+    const roadW = WORLD_CFG.roadWidth || 14;
+    const blockSz = WORLD_CFG.blockSize || 44;
+    const halfSpan = WORLD_CFG.halfSpan || 260;
     const deckH = (typeof TERRAIN !== 'undefined' && TERRAIN.bridgeHeight) || 9;
-    const bridgeW = (typeof TERRAIN !== 'undefined' && TERRAIN.bridgeWidth) || 14;
-    const rampLen = (typeof TERRAIN !== 'undefined' && TERRAIN.rampLength) || 36;
-    const deckLen = WORLD_CFG.blockSize + WORLD_CFG.roadWidth;
+    const bridgeW = (typeof TERRAIN !== 'undefined' && TERRAIN.bridgeWidth) || roadW;
+    const rampLen = Math.min(24, (typeof TERRAIN !== 'undefined' && TERRAIN.rampLength) || 18);
+    const count = Math.min(
+      (typeof TERRAIN !== 'undefined' && TERRAIN.bridgeCount) || 6,
+      Math.max(1, streets.length - 1)
+    );
 
-    const deckMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.75, metalness: 0.2 });
-    const railMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.4, metalness: 0.6 });
-    const pillarMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.85 });
+    const texCanvas = document.createElement('canvas');
+    texCanvas.width = 128;
+    texCanvas.height = 128;
+    const tCtx = texCanvas.getContext('2d');
+    tCtx.fillStyle = '#1b202c';
+    tCtx.fillRect(0, 0, 128, 128);
+    tCtx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+    for (let y = 0; y < 128; y += 16) {
+      for (let x = (y / 16) % 2 === 0 ? 0 : 8; x < 128; x += 16) {
+        tCtx.fillRect(x, y, 8, 8);
+      }
+    }
+    const deckTex = new THREE.CanvasTexture(texCanvas);
+    deckTex.wrapS = THREE.RepeatWrapping;
+    deckTex.wrapT = THREE.RepeatWrapping;
+    deckTex.repeat.set(1, 4);
+    deckTex.colorSpace = THREE.SRGBColorSpace;
 
-    const streets = this.streetCoords && this.streetCoords.length > 1 ? this.streetCoords : [-80, 0, 80];
+    const flushDeckMat = new THREE.MeshStandardMaterial({
+      map: deckTex,
+      color: 0x242a38,
+      roughness: 0.85,
+      metalness: 0.08
+    });
+    const dashMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
+    const curbMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.65, metalness: 0.25 });
+    const railMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.35, metalness: 0.65 });
+    const pillarMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.8, metalness: 0.2 });
+    const overDeckMat = new THREE.MeshStandardMaterial({ color: 0x1e2433, roughness: 0.8, metalness: 0.15 });
+
+    const spanDist = Math.max(20, Math.abs(streets[1] - streets[0]));
+    const usableDeckLen = Math.max(12, spanDist - roadW - rampLen * 2);
 
     for (let i = 0; i < count; i++) {
+      const idxA = i % (streets.length - 1);
+      const sA = streets[idxA];
+      const sB = streets[idxA + 1];
+      const midSpan = clamp((sA + sB) * 0.5, -halfSpan + roadW, halfSpan - roadW);
+      const crossStreet = clamp(
+        streets[(i * 2 + 1) % streets.length],
+        -halfSpan + roadW,
+        halfSpan - roadW
+      );
       const horizontal = i % 2 === 0;
-      const fixedCoord = streets[i % streets.length];
-      const spanCoord = streets[(i + 1) % streets.length] * 0.5 + streets[i % streets.length] * 0.5;
 
-      const bridge = new THREE.Group();
-      const deck = new THREE.Mesh(new THREE.BoxGeometry(bridgeW, 0.5, deckLen), deckMat);
-      deck.position.y = deckH;
-      deck.castShadow = true;
+      const groundBridge = new THREE.Group();
+
+      const deck = new THREE.Mesh(
+        new THREE.BoxGeometry(roadW, 0.04, usableDeckLen),
+        flushDeckMat
+      );
+      deck.position.set(0, 0.01, 0);
       deck.receiveShadow = true;
-      bridge.add(deck);
+      groundBridge.add(deck);
 
-      const rampAngle = Math.atan2(deckH, rampLen);
-      const rampHyp = Math.hypot(deckH, rampLen);
-      for (const dir of [-1, 1]) {
-        const ramp = new THREE.Mesh(new THREE.BoxGeometry(bridgeW, 0.45, rampHyp), deckMat);
-        ramp.position.set(0, deckH * 0.5, dir * (deckLen * 0.5 + rampLen * 0.5));
-        ramp.rotation.x = dir * rampAngle;
-        ramp.receiveShadow = true;
-        bridge.add(ramp);
+      for (let dz = -usableDeckLen * 0.4; dz <= usableDeckLen * 0.4; dz += 8) {
+        const dash = new THREE.Mesh(new THREE.PlaneGeometry(0.24, 3.8), dashMat);
+        dash.rotation.x = -Math.PI * 0.5;
+        dash.position.set(0, 0.032, dz);
+        groundBridge.add(dash);
       }
 
       for (const side of [-1, 1]) {
-        const rail = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.9, deckLen), railMat);
-        rail.position.set(side * (bridgeW * 0.5 - 0.2), deckH + 0.65, 0);
-        bridge.add(rail);
+        const curb = new THREE.Mesh(
+          new THREE.BoxGeometry(0.45, 0.22, usableDeckLen + rampLen * 1.4),
+          curbMat
+        );
+        curb.position.set(side * (roadW * 0.5 - 0.18), 0.11, 0);
+        curb.receiveShadow = true;
+        groundBridge.add(curb);
+      }
 
-        const pillar = new THREE.Mesh(new THREE.BoxGeometry(1.1, deckH, 1.1), pillarMat);
-        pillar.position.set(side * (bridgeW * 0.36), deckH * 0.5, 0);
-        pillar.castShadow = true;
-        bridge.add(pillar);
+      for (const endDir of [-1, 1]) {
+        const ramp = new THREE.Mesh(
+          new THREE.BoxGeometry(roadW - 0.6, 0.03, rampLen),
+          flushDeckMat
+        );
+        ramp.position.set(
+          0,
+          0.015,
+          endDir * (usableDeckLen * 0.5 + rampLen * 0.5)
+        );
+        ramp.receiveShadow = true;
+        groundBridge.add(ramp);
       }
 
       if (horizontal) {
-        bridge.rotation.y = Math.PI * 0.5;
-        bridge.position.set(spanCoord, 0, fixedCoord);
+        groundBridge.rotation.y = Math.PI * 0.5;
+        groundBridge.position.set(midSpan, 0, crossStreet);
       } else {
-        bridge.position.set(fixedCoord, 0, spanCoord);
+        groundBridge.position.set(crossStreet, 0, midSpan);
+      }
+      this.bridgeGroup.add(groundBridge);
+
+      const overLen = blockSz + roadW * 0.6;
+      const overGroup = new THREE.Group();
+
+      const overDeck = new THREE.Mesh(
+        new THREE.BoxGeometry(bridgeW, 0.65, overLen),
+        overDeckMat
+      );
+      overDeck.position.set(0, deckH, 0);
+      overDeck.castShadow = true;
+      overDeck.receiveShadow = true;
+      overGroup.add(overDeck);
+
+      for (const side of [-1, 1]) {
+        const rail = new THREE.Mesh(
+          new THREE.BoxGeometry(0.3, 1.0, overLen),
+          railMat
+        );
+        rail.position.set(side * (bridgeW * 0.5 - 0.2), deckH + 0.75, 0);
+        rail.castShadow = true;
+        overGroup.add(rail);
+
+        for (const pDir of [-1, 1]) {
+          const pzLocal = pDir * (overLen * 0.34);
+          const pillar = new THREE.Mesh(
+            new THREE.BoxGeometry(1.1, deckH, 1.1),
+            pillarMat
+          );
+          pillar.position.set(side * (bridgeW * 0.38), deckH * 0.5, pzLocal);
+          pillar.castShadow = true;
+          pillar.receiveShadow = true;
+          overGroup.add(pillar);
+
+          const worldPillar = new THREE.Vector3(
+            side * (bridgeW * 0.38),
+            0,
+            pzLocal
+          );
+          if (horizontal) {
+            const rotY = Math.PI * 0.5;
+            const wx = midSpan + worldPillar.x * Math.cos(rotY) + worldPillar.z * Math.sin(rotY);
+            const wz = crossStreet - worldPillar.x * Math.sin(rotY) + worldPillar.z * Math.cos(rotY);
+            this.colliders.push({
+              minX: wx - 0.65,
+              maxX: wx + 0.65,
+              minZ: wz - 0.65,
+              maxZ: wz + 0.65
+            });
+          } else {
+            const wx = crossStreet + worldPillar.x;
+            const wz = midSpan + worldPillar.z;
+            this.colliders.push({
+              minX: wx - 0.65,
+              maxX: wx + 0.65,
+              minZ: wz - 0.65,
+              maxZ: wz + 0.65
+            });
+          }
+        }
       }
 
-      this.bridgeGroup.add(bridge);
+      if (horizontal) {
+        overGroup.rotation.y = Math.PI * 0.5;
+        overGroup.position.set(midSpan, 0, crossStreet);
+      } else {
+        overGroup.position.set(crossStreet, 0, midSpan);
+      }
+      this.bridgeGroup.add(overGroup);
     }
   }
 
