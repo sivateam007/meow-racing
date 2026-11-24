@@ -3,6 +3,8 @@ import {
   WORLD_CFG,
   TRAFFIC_CFG,
   PED_CFG,
+  VEHICLE_TYPES,
+  SURVIVAL,
   COLORS,
   clamp,
   lerp,
@@ -288,6 +290,7 @@ export class World {
     }
 
     this._buildSkyline();
+    this._buildOilDistrict();
   }
 
   _buildSkyline() {
@@ -345,54 +348,111 @@ export class World {
   }
 
   _createVehicleMesh(typeKey, colorHex) {
-    const cfg = TRAFFIC_CFG.types[typeKey] || TRAFFIC_CFG.types.sedan;
+    const spec = (VEHICLE_TYPES && VEHICLE_TYPES[typeKey]) ||
+      TRAFFIC_CFG.types[typeKey] || TRAFFIC_CFG.types.sedan;
+    const w = spec.w || spec.width || 2.0;
+    const h = spec.h || spec.height || 1.25;
+    const l = spec.l || spec.length || 4.1;
+    const col = colorHex ?? (spec.colors && spec.colors[0]) ?? 0x3b82f6;
+
     const group = new THREE.Group();
+    const wheels = [];
+    const bodyMat = new THREE.MeshStandardMaterial({ color: col, roughness: 0.3, metalness: 0.35 });
+    const darkMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.2, metalness: 0.7 });
+    const tireMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.85 });
+    const hazardMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
+    const lightMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
 
-    const bodyMat = new THREE.MeshStandardMaterial({
-      color: colorHex,
-      roughness: 0.32,
-      metalness: 0.35
-    });
-    const cabinMat = new THREE.MeshStandardMaterial({
-      color: 0x0f172a,
-      roughness: 0.15,
-      metalness: 0.75
-    });
-    const tireMat = new THREE.MeshStandardMaterial({
-      color: 0x111827,
-      roughness: 0.85
-    });
+    if (typeKey === 'bike') {
+      const wr = 0.38;
+      const wg = new THREE.CylinderGeometry(wr, wr, 0.22, 12);
+      wg.rotateZ(Math.PI * 0.5);
+      for (const zOff of [l * 0.36, -l * 0.36]) {
+        const wm = new THREE.Mesh(wg, tireMat);
+        wm.position.set(0, wr, zOff);
+        group.add(wm);
+        wheels.push(wm);
+      }
+      const frame = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.45, l * 0.72), bodyMat);
+      frame.position.set(0, wr + 0.28, 0);
+      group.add(frame);
+      const rider = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.58, 0.32), darkMat);
+      rider.position.set(0, wr + 0.74, -0.06);
+      group.add(rider);
+      const helmet = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.36, 0.38), hazardMat);
+      helmet.position.set(0, wr + 1.18, 0.02);
+      group.add(helmet);
+      return { group, wheels };
+    }
 
-    const wRadius = 0.42;
-    const chassisH = cfg.height * 0.55;
-    const lower = new THREE.Mesh(new THREE.BoxGeometry(cfg.width, chassisH, cfg.length), bodyMat);
-    lower.position.y = wRadius + chassisH * 0.5;
+    const wheelR = 0.42;
+    const lowerH = h * 0.52;
+    const lower = new THREE.Mesh(new THREE.BoxGeometry(w, lowerH, l), bodyMat);
+    lower.position.y = wheelR + lowerH * 0.5;
     lower.castShadow = true;
     lower.receiveShadow = true;
     group.add(lower);
 
-    const upperH = Math.max(0.35, cfg.height - chassisH);
-    const upper = new THREE.Mesh(
-      new THREE.BoxGeometry(cfg.width * 0.84, upperH, cfg.length * 0.58),
-      typeKey === 'truck' || typeKey === 'bus' ? bodyMat : cabinMat
-    );
-    upper.position.y = wRadius + chassisH + upperH * 0.5 - 0.04;
-    upper.castShadow = true;
-    group.add(upper);
+    const hlGeo = new THREE.BoxGeometry(0.32, 0.18, 0.1);
+    for (const side of [-1, 1]) {
+      const hl = new THREE.Mesh(hlGeo, lightMat);
+      hl.position.set(side * (w * 0.34), wheelR + lowerH * 0.55, -l * 0.5 - 0.03);
+      group.add(hl);
+    }
 
-    const wheelGeo = new THREE.CylinderGeometry(wRadius, wRadius, 0.32, 10);
+    if (typeKey === 'oil_tanker') {
+      const tank = new THREE.Mesh(new THREE.CylinderGeometry(w * 0.44, w * 0.44, l * 0.74, 14), bodyMat);
+      tank.rotation.x = Math.PI * 0.5;
+      tank.position.set(0, wheelR + lowerH + w * 0.38, 0.15);
+      tank.castShadow = true;
+      group.add(tank);
+      const stripe = new THREE.Mesh(new THREE.BoxGeometry(w * 0.92, 0.22, l * 0.82), hazardMat);
+      stripe.position.set(0, wheelR + lowerH * 0.85, 0);
+      group.add(stripe);
+    } else if (typeKey === 'bus') {
+      const upperH = Math.max(0.7, h - lowerH);
+      const cabin = new THREE.Mesh(new THREE.BoxGeometry(w * 0.92, upperH, l * 0.88), darkMat);
+      cabin.position.set(0, wheelR + lowerH + upperH * 0.5, 0);
+      cabin.castShadow = true;
+      group.add(cabin);
+      const band = new THREE.Mesh(new THREE.BoxGeometry(w * 0.96, 0.24, l * 0.9), bodyMat);
+      band.position.set(0, wheelR + lowerH + upperH * 0.65, 0);
+      group.add(band);
+    } else {
+      const upperH = Math.max(0.38, h - lowerH);
+      const cabin = new THREE.Mesh(new THREE.BoxGeometry(w * 0.82, upperH, l * 0.56), darkMat);
+      cabin.position.set(0, wheelR + lowerH + upperH * 0.5 - 0.03, -0.1);
+      cabin.castShadow = true;
+      group.add(cabin);
+    }
+
+    if (typeKey === 'taxi') {
+      const sign = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.24, 0.28), hazardMat);
+      sign.position.set(0, wheelR + h + 0.08, -0.1);
+      group.add(sign);
+    }
+
+    if (typeKey === 'police') {
+      const redMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
+      const blueMat = new THREE.MeshBasicMaterial({ color: 0x3b82f6 });
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(w * 0.72, 0.2, 0.32), darkMat);
+      bar.position.set(0, wheelR + h + 0.08, -0.05);
+      group.add(bar);
+      const rLamp = new THREE.Mesh(new THREE.BoxGeometry(w * 0.32, 0.22, 0.34), redMat);
+      rLamp.position.set(-w * 0.18, wheelR + h + 0.09, -0.05);
+      group.add(rLamp);
+      const bLamp = new THREE.Mesh(new THREE.BoxGeometry(w * 0.32, 0.22, 0.34), blueMat);
+      bLamp.position.set(w * 0.18, wheelR + h + 0.09, -0.05);
+      group.add(bLamp);
+    }
+
+    const wheelGeo = new THREE.CylinderGeometry(wheelR, wheelR, 0.32, 10);
     wheelGeo.rotateZ(Math.PI * 0.5);
-    const wheels = [];
-    const wx = cfg.width * 0.5;
-    const wz = cfg.length * 0.32;
-    for (const [cx, cz] of [
-      [-wx, wz],
-      [wx, wz],
-      [-wx, -wz],
-      [wx, -wz]
-    ]) {
+    const wx = w * 0.5;
+    const wz = l * 0.32;
+    for (const [cx, cz] of [[-wx, wz], [wx, wz], [-wx, -wz], [wx, -wz]]) {
       const wm = new THREE.Mesh(wheelGeo, tireMat);
-      wm.position.set(cx, wRadius, cz);
+      wm.position.set(cx, wheelR, cz);
       wm.castShadow = true;
       group.add(wm);
       wheels.push(wm);
@@ -405,18 +465,21 @@ export class World {
     this.trafficGroup.clear();
     this.trafficPool.length = 0;
 
-    const typeKeys = Object.keys(TRAFFIC_CFG.types);
+    const typeKeys = Object.keys(VEHICLE_TYPES || TRAFFIC_CFG.types).filter(
+      (k) => (VEHICLE_TYPES[k] ? VEHICLE_TYPES[k].spawnWeight : 1) > 0
+    );
     for (let i = 0; i < TRAFFIC_CFG.poolSize; i++) {
       const typeKey = typeKeys[i % typeKeys.length];
-      const tCfg = TRAFFIC_CFG.types[typeKey];
-      const colorHex = tCfg.colors[i % tCfg.colors.length];
+      const tCfg = VEHICLE_TYPES[typeKey] || TRAFFIC_CFG.types[typeKey] || TRAFFIC_CFG.types.sedan;
+      const colors = tCfg.colors || [0x3b82f6];
+      const colorHex = colors[i % colors.length];
       const { group, wheels } = this._createVehicleMesh(typeKey, colorHex);
       this.trafficGroup.add(group);
 
       const agent = {
         typeKey,
-        width: tCfg.width,
-        length: tCfg.length,
+        width: tCfg.w || tCfg.width || 2.0,
+        length: tCfg.l || tCfg.length || 4.1,
         baseSpeed: randRange(tCfg.speedMin, tCfg.speedMax),
         currentSpeed: 0,
         group,
@@ -793,7 +856,7 @@ export class World {
     }
   }
 
-  update(dt, playerPos = { x: 0, z: 0 }) {
+  update(dt, playerPos = { x: 0, z: 0 }, wantedLevel = 0) {
     const safeDt = Math.min(dt, 0.05);
     this.time += safeDt;
 
@@ -801,6 +864,135 @@ export class World {
     this._updateTraffic(safeDt, playerPos);
     this._updatePedestrians(safeDt, playerPos);
     this._updateDayNight(safeDt);
+    this._updatePolice(safeDt, playerPos, wantedLevel || 0);
+  }
+
+  _buildOilDistrict() {
+    const size = (SURVIVAL && SURVIVAL.oilDistrictSize) || 44;
+    const targetBlock = this.blockCenters[this.blockCenters.length - 1] || {
+      x: WORLD_CFG.halfSpan * 0.5,
+      z: WORLD_CFG.halfSpan * 0.5
+    };
+    const group = new THREE.Group();
+    group.position.set(targetBlock.x, 0, targetBlock.z);
+
+    const padMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.85 });
+    const tankMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.35, metalness: 0.6 });
+    const pipeMat = new THREE.MeshStandardMaterial({ color: 0xf97316, roughness: 0.45, metalness: 0.5 });
+    const hazardMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
+
+    const pad = new THREE.Mesh(new THREE.BoxGeometry(size, 0.25, size), padMat);
+    pad.position.y = 0.125;
+    pad.receiveShadow = true;
+    group.add(pad);
+
+    const tankOffsets = [[-10, -8, 4.2, 11], [8, -9, 4.8, 13], [-9, 9, 3.6, 8.5]];
+    for (const [tx, tz, rad, h] of tankOffsets) {
+      const tank = new THREE.Mesh(new THREE.CylinderGeometry(rad, rad, h, 14), tankMat);
+      tank.position.set(tx, 0.25 + h * 0.5, tz);
+      tank.castShadow = true;
+      group.add(tank);
+      const band = new THREE.Mesh(new THREE.CylinderGeometry(rad + 0.08, rad + 0.08, 0.5, 14), hazardMat);
+      band.position.set(tx, 0.25 + h * 0.22, tz);
+      group.add(band);
+      this.colliders.push({
+        minX: targetBlock.x + tx - rad,
+        maxX: targetBlock.x + tx + rad,
+        minZ: targetBlock.z + tz - rad,
+        maxZ: targetBlock.z + tz + rad
+      });
+    }
+
+    const pump = new THREE.Mesh(new THREE.BoxGeometry(4.5, 3.2, 4.5), pipeMat);
+    pump.position.set(9, 1.85, 9);
+    pump.castShadow = true;
+    group.add(pump);
+
+    const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 18, 8), pipeMat);
+    pipe.rotation.z = Math.PI * 0.5;
+    pipe.position.set(0, 2.2, -8);
+    group.add(pipe);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(0, 0, 256, 64);
+    ctx.strokeStyle = '#f59e0b';
+    ctx.lineWidth = 6;
+    ctx.strokeRect(3, 3, 250, 58);
+    ctx.fillStyle = '#fbbf24';
+    ctx.font = '900 32px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('OIL CO', 128, 34);
+    const signTex = new THREE.CanvasTexture(canvas);
+    const signMesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(10, 2.5),
+      new THREE.MeshBasicMaterial({ map: signTex, side: THREE.DoubleSide })
+    );
+    signMesh.position.set(0, 6.5, size * 0.46);
+    group.add(signMesh);
+
+    const flood = new THREE.PointLight(0xffedd5, 1.4, 36);
+    flood.position.set(0, 9, 0);
+    group.add(flood);
+
+    this.scene.add(group);
+  }
+
+  _spawnPolice(wantedLevel = 0, playerPos = { x: 0, z: 0 }) {
+    if (!Array.isArray(this.policePool)) this.policePool = [];
+    const targetCount = clamp(
+      Math.floor(wantedLevel),
+      0,
+      (SURVIVAL && SURVIVAL.wantedMax) || 5
+    );
+    while (this.policePool.length < targetCount) {
+      const idx = this.policePool.length;
+      const built = this._createVehicleMesh('police', 0x0f172a);
+      const mesh = built.group || built;
+      const angle = (idx / Math.max(1, targetCount)) * Math.PI * 2;
+      const dist = 34 + idx * 7;
+      mesh.position.set(
+        clamp((playerPos.x || 0) + Math.cos(angle) * dist, -WORLD_CFG.halfSpan + 4, WORLD_CFG.halfSpan - 4),
+        0,
+        clamp((playerPos.z || 0) + Math.sin(angle) * dist, -WORLD_CFG.halfSpan + 4, WORLD_CFG.halfSpan - 4)
+      );
+      this.scene.add(mesh);
+      this.policePool.push({ mesh, heading: 0, speed: 26 });
+    }
+    while (this.policePool.length > targetCount) {
+      const removed = this.policePool.pop();
+      if (removed && removed.mesh) this.scene.remove(removed.mesh);
+    }
+  }
+
+  _updatePolice(dt, playerPos = { x: 0, z: 0 }, wantedLevel = 0) {
+    this._spawnPolice(wantedLevel, playerPos);
+    if (!Array.isArray(this.policePool) || this.policePool.length === 0) return;
+    const safeDt = Math.min(dt, 0.05);
+    const px = playerPos.x || 0;
+    const pz = playerPos.z || 0;
+    const spanLimit = WORLD_CFG.halfSpan - 2;
+    for (let i = 0; i < this.policePool.length; i++) {
+      const cop = this.policePool[i];
+      const pos = cop.mesh.position;
+      const dx = px - pos.x;
+      const dz = pz - pos.z;
+      const dist = Math.hypot(dx, dz);
+      const desiredHeading = Math.atan2(-dx, -dz);
+      let diff = desiredHeading - cop.heading;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      cop.heading += diff * Math.min(1, safeDt * 4.5);
+      const targetSpeed = dist > 12 ? 32 + wantedLevel * 2.2 : 16;
+      cop.speed = lerp(cop.speed, targetSpeed, safeDt * 4);
+      pos.x = clamp(pos.x - Math.sin(cop.heading) * cop.speed * safeDt, -spanLimit, spanLimit);
+      pos.z = clamp(pos.z - Math.cos(cop.heading) * cop.speed * safeDt, -spanLimit, spanLimit);
+      cop.mesh.rotation.y = cop.heading;
+    }
   }
 
   getColliders() {

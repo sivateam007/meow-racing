@@ -166,3 +166,111 @@ export function lerp(a, b, t) {
 export function randRange(min, max) {
   return min + Math.random() * (max - min);
 }
+/* === PHASE 2 ADDITIONS (Gemini) === */
+export const VEHICLE_TYPES = {
+  sedan: {
+    label: 'Sedan',
+    w: 1.95,
+    h: 1.25,
+    l: 4.1,
+    speedMin: 13,
+    speedMax: 21,
+    spawnWeight: 26,
+    colors: [0x3b82f6, 0x10b981, 0xe2e8f0, 0xf97316, 0x6366f1]
+  },
+  sports: {
+    label: 'Sports',
+    w: 2.0,
+    h: 1.0,
+    l: 4.3,
+    speedMin: 21,
+    speedMax: 30,
+    spawnWeight: 16,
+    colors: [0xef4444, 0xfacc15, 0x00f5d4, 0xec4899]
+  },
+  van: {
+    label: 'Van',
+    w: 2.15,
+    h: 1.75,
+    l: 4.7,
+    speedMin: 11,
+    speedMax: 18,
+    spawnWeight: 14,
+    colors: [0xf8fafc, 0x38bdf8, 0xfbbf24, 0x94a3b8]
+  },
+  truck: {
+    label: 'Truck',
+    w: 2.35,
+    h: 2.45,
+    l: 6.4,
+    speedMin: 9,
+    speedMax: 15,
+    spawnWeight: 10,
+    colors: [0xdc2626, 0xd97706, 0x475569, 0x0284c7]
+  },
+  bus: {
+    label: 'Bus',
+    w: 2.45,
+    h: 2.65,
+    l: 7.4,
+    speedMin: 10,
+    speedMax: 16,
+    spawnWeight: 10,
+    colors: [0xf59e0b, 0x16a34a, 0x2563eb]
+  },
+  bike: {
+    label: 'Bike',
+    w: 0.95,
+    h: 1.35,
+    l: 2.2,
+    speedMin: 18,
+    speedMax: 29,
+    spawnWeight: 12,
+    colors: [0xff2a85, 0x00e5ff, 0xfacc15, 0xa855f7]
+  },
+  oil_tanker: {
+    label: 'Oil Tanker',
+    w: 2.45,
+    h: 2.6,
+    l: 7.2,
+    speedMin: 9,
+    speedMax: 14,
+    spawnWeight: 8,
+    colors: [0xd97706, 0xea580c, 0xf59e0b]
+  },
+  taxi: {
+    label: 'Taxi',
+    w: 1.95,
+    h: 1.3,
+    l: 4.15,
+    speedMin: 15,
+    speedMax: 24,
+    spawnWeight: 14,
+    colors: [0xfacc15, 0xfbbf24]
+  },
+  police: {
+    label: 'Police',
+    w: 2.0,
+    h: 1.35,
+    l: 4.3,
+    speedMin: 22,
+    speedMax: 32,
+    spawnWeight: 0,
+    colors: [0x0f172a, 0x1e293b]
+  }
+};
+
+export const SURVIVAL = {
+  maxHealth: 100,
+  crashDamage: 18,
+  pedPenalty: 10,
+  wantedDecay: 0.05,
+  wantedMax: 5,
+  missionReward: 150,
+  oilDistrictSize: 44
+};
+
+export const MISSION = {
+  targetDistance: 240,
+  reward: 150
+};

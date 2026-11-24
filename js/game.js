@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import anime from 'animejs';
-import { WORLD_CFG, CAR_CFG, COLORS, INPUT, clamp } from './config.js';
+import { WORLD_CFG, CAR_CFG, COLORS, INPUT, SURVIVAL, clamp } from './config.js';
 import Car from './car.js';
 import World from './world.js';
 import Effects from './effects.js';
@@ -271,6 +271,7 @@ export class Game {
           this.collisionCooldown = 0.22;
           this.effects.shake(0.45, 240);
           this.effects.impact({ x: closestX, y: 0.7, z: closestZ });
+          this._onCrash({ x: closestX, y: 0.7, z: closestZ });
         }
       }
     }
@@ -296,9 +297,20 @@ export class Game {
             this.collisionCooldown = 0.25;
             this.effects.shake(0.55, 280);
             this.effects.impact({ x: (pos.x + tPos.x) * 0.5, y: 0.8, z: (pos.z + tPos.z) * 0.5 });
+            this._onCrash({ x: (pos.x + tPos.x) * 0.5, y: 0.8, z: (pos.z + tPos.z) * 0.5 });
           }
         }
       }
+    }
+  }
+
+  _onCrash(worldPos) {
+    this.health = (typeof this.health === 'number' ? this.health : SURVIVAL.maxHealth) - SURVIVAL.crashDamage;
+    this.wanted = Math.min(SURVIVAL.wantedMax, (this.wanted || 0) + 1);
+    if (this.health <= 0) {
+      this.health = SURVIVAL.maxHealth;
+      this.wanted = 0;
+      this.car.reset(0, 0, 0);
     }
   }
 
@@ -336,6 +348,16 @@ export class Game {
   }
 
   _updateHud() {
+    const hpFill = document.getElementById('hud-health-fill');
+    if (hpFill) {
+      const hpPct = Math.max(0, Math.min(100, ((this.health ?? SURVIVAL.maxHealth) / SURVIVAL.maxHealth) * 100));
+      hpFill.style.width = `${hpPct}%`;
+    }
+    const wantedEl = document.getElementById('hud-wanted');
+    if (wantedEl) {
+      const stars = Math.max(0, Math.min(SURVIVAL.wantedMax, Math.round(this.wanted || 0)));
+      wantedEl.textContent = '★'.repeat(stars) + '☆'.repeat(SURVIVAL.wantedMax - stars);
+    }
     if (this.speedEl) {
       const kmh = Math.round(Math.abs(this.car.speed || 0) * 3.6);
       this.speedEl.textContent = String(kmh);
@@ -409,6 +431,7 @@ export class Game {
 
     if (this.state === 'play') {
       this.elapsedTime += dt;
+      this.wanted = Math.max(0, (this.wanted || 0) - SURVIVAL.wantedDecay * dt);
     }
 
     this.car.update(dt, input);
@@ -417,7 +440,7 @@ export class Game {
     }
 
     const carPos = this.car.getPosition();
-    this.world.update(dt, carPos);
+    this.world.update(dt, carPos, this.wanted || 0);
 
     const speedFactor = clamp(Math.abs(this.car.speed) / Math.max(1, CAR_CFG.maxSpeed), 0, 1);
     this.effects.update(dt, this.car, speedFactor);
