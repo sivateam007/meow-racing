@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import anime from 'animejs';
-import { WORLD_CFG, CAR_CFG, COLORS, INPUT, SURVIVAL, clamp } from './config.js';
+import { WORLD_CFG, CAR_CFG, COLORS, INPUT, SURVIVAL, FUEL, clamp } from './config.js';
 import Car from './car.js';
 import World from './world.js';
 import Effects from './effects.js';
@@ -77,10 +77,10 @@ export class Game {
       document.body.appendChild(this.renderer.domElement);
     }
 
-    const hemiLight = new THREE.HemisphereLight(0xe0f2fe, 0x334155, 1.05);
-    this.scene.add(hemiLight);
+    this.hemiLight = new THREE.HemisphereLight(0xe0f2fe, 0x94a3b8, 1.55);
+    this.scene.add(this.hemiLight);
 
-    this.sunLight = new THREE.DirectionalLight(COLORS.sunDay, 1.5);
+    this.sunLight = new THREE.DirectionalLight(COLORS.sunDay, 2.1);
     this.sunLight.position.set(45, 75, 40);
     this.sunLight.castShadow = true;
     this.sunLight.shadow.mapSize.set(1024, 1024);
@@ -183,6 +183,7 @@ export class Game {
 
   startGame() {
     this.state = 'play';
+    if (typeof FUEL !== 'undefined') this.fuel = FUEL.startAmount ?? FUEL.max ?? 100;
     if (this.world && typeof this.world._startStreetRace === 'function') {
       this.world._startStreetRace(this.car.getPosition());
     }
@@ -356,6 +357,12 @@ export class Game {
   }
 
   _updateHud() {
+    const fuelEl = document.getElementById('hud-fuel');
+    if (fuelEl) {
+      const maxFuel = (typeof FUEL !== 'undefined' && FUEL.max) || 100;
+      const curFuel = typeof this.fuel === 'number' ? this.fuel : maxFuel;
+      fuelEl.textContent = `${Math.ceil((curFuel / maxFuel) * 100)}%`;
+    }
     const missionEl = document.getElementById('hud-mission');
     if (missionEl && this.world) {
       if (this.world.raceActive) {
@@ -459,6 +466,19 @@ export class Game {
 
     const carPos = this.car.getPosition();
     this.world.update(dt, carPos, this.wanted || 0);
+
+    if (this.state === 'play' && typeof FUEL !== 'undefined') {
+      const maxFuel = FUEL.max || 100;
+      this.fuel = typeof this.fuel === 'number' ? this.fuel : maxFuel;
+      const nearStation = this.world && typeof this.world._updateFuelStation === 'function'
+        ? this.world._updateFuelStation(dt, carPos)
+        : false;
+      if (nearStation) {
+        this.fuel = clamp(this.fuel + (FUEL.refillRate || 55) * dt, 0, maxFuel);
+      } else {
+        this.fuel = clamp(this.fuel - (FUEL.drainPerSec || 0.35) * dt, 0, maxFuel);
+      }
+    }
 
     const raceReward = this.world && typeof this.world._updateStreetRace === 'function'
       ? this.world._updateStreetRace(dt, carPos)

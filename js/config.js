@@ -25,7 +25,7 @@ export const COLORS = {
 };
 
 export const WORLD_CFG = {
-  blocksPerSide: 9,
+  blocksPerSide: 11,
   blockSize: 44,
   roadWidth: 14,
   laneOffset: 3.4,
@@ -82,7 +82,7 @@ export const CAR_CFG = {
 };
 
 export const TRAFFIC_CFG = {
-  poolSize: 26,
+  poolSize: 40,
   spawnMinDist: 38,
   spawnMaxDist: 135,
   recycleDist: 165,
@@ -134,7 +134,7 @@ export const TRAFFIC_CFG = {
 };
 
 export const PED_CFG = {
-  poolSize: 32,
+  poolSize: 56,
   spawnMinDist: 18,
   spawnMaxDist: 95,
   recycleDist: 120,
@@ -303,3 +303,20 @@ export const PED_STYLES = ['casual', 'business', 'runner', 'skater', 'tourist'];
 // coupe: { label: 'Coupe', w: 1.96, h: 1.12, l: 4.15, speedMin: 20, speedMax: 29, spawnWeight: 14, colors: [0xf43f5e, 0x38bdf8, 0xfacc15, 0xa855f7] },
 // muscle: { label: 'Muscle', w: 2.08, h: 1.18, l: 4.55, speedMin: 22, speedMax: 32, spawnWeight: 12, colors: [0xf97316, 0x1e293b, 0xdc2626, 0xfbbf24] },
 // supercar: { label: 'Supercar', w: 2.12, h: 0.94, l: 4.45, speedMin: 27, speedMax: 38, spawnWeight: 8, colors: [0x00f5d4, 0xff2a85, 0xfef08a, 0x2563eb] },
+/* === PHASE 4 ADDITIONS (Gemini) === */
+export const FUEL = {
+  max: 100,
+  drainPerSec: 0.35,
+  refillRate: 55,
+  stationRadius: 11,
+  startAmount: 100
+};
+
+export const DISTRICTS = {
+  downtown: 'downtown',
+  suburbs: 'suburbs',
+  beach: 'beach',
+  desert: 'desert',
+  airport: 'airport',
+  industrial: 'industrial'
+};

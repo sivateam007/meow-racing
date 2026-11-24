@@ -583,3 +583,18 @@ body {
     right: 98px;
   }
 }
+/* === PHASE 4 FUEL STYLE (Gemini) === */
+.hud-fuel-chip {
+  background: linear-gradient(90deg, rgba(249, 115, 22, 0.45) 0%, rgba(34, 211, 238, 0.38) 100%);
+  border: 1.5px solid #22d3ee;
+  color: #e0f2fe;
+  font-weight: 900;
+  box-shadow: 0 6px 16px rgba(34, 211, 238, 0.25);
+}
+
+@media (max-width: 820px) {
+  .hud-fuel-chip {
+    padding: 5px 8px;
+    font-size: 11px;
+  }
+}

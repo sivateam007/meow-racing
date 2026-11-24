@@ -7,6 +7,7 @@ import {
   SURVIVAL,
   TERRAIN,
   RACE,
+  FUEL,
   COLORS,
   clamp,
   lerp,
@@ -295,6 +296,9 @@ export class World {
     this._buildOilDistrict();
     this._buildTerrain();
     this._buildBridges();
+    this._buildGreenDistricts();
+    this._buildDesertAirport();
+    this._buildFuelStation();
   }
 
   _buildSkyline() {
@@ -843,12 +847,15 @@ export class World {
 
   _updateDayNight(dt) {
     const cycle = WORLD_CFG.dayCycleDurationSec;
+    // Start at midday; keep a long daylight window for the first play session.
     this.lightPhase = (this.time % cycle) / cycle;
     const daylight = 0.5 + 0.5 * Math.cos(this.lightPhase * Math.PI * 2);
+    const dayBoost = this.time < cycle * 0.5 ? 0.35 : 0;
+    const dayLight = Math.min(1, daylight + dayBoost);
 
-    const topCol = new THREE.Color(COLORS.skyNightTop).lerp(new THREE.Color(COLORS.skyDayTop), daylight);
-    const fogCol = new THREE.Color(COLORS.fogNight).lerp(new THREE.Color(COLORS.fogDay), daylight);
-    const sunCol = new THREE.Color(COLORS.sunNight).lerp(new THREE.Color(COLORS.sunDay), daylight);
+    const topCol = new THREE.Color(COLORS.skyNightTop).lerp(new THREE.Color(COLORS.skyDayTop), dayLight);
+    const fogCol = new THREE.Color(COLORS.fogNight).lerp(new THREE.Color(COLORS.fogDay), dayLight);
+    const sunCol = new THREE.Color(COLORS.sunNight).lerp(new THREE.Color(COLORS.sunDay), dayLight);
 
     this.scene.background = topCol;
     if (this.scene.fog) {
@@ -856,7 +863,7 @@ export class World {
     }
     if (this.sunLight) {
       this.sunLight.color.copy(sunCol);
-      this.sunLight.intensity = lerp(0.55, 1.55, daylight);
+      this.sunLight.intensity = lerp(0.7, 2.1, dayLight);
     }
   }
 
@@ -869,6 +876,7 @@ export class World {
     this._updatePedestrians(safeDt, playerPos);
     this._updateDayNight(safeDt);
     this._updatePolice(safeDt, playerPos, wantedLevel || 0);
+    this._updateFuelStation(safeDt, playerPos);
   }
 
   _buildOilDistrict() {
@@ -1239,6 +1247,7 @@ _buildBridges() {
       }
       this.bridgeGroup.add(overGroup);
     }
+    this._buildBetterBridges();
   }
 
   _startStreetRace(playerPos = { x: 0, z: 0 }) {
@@ -1319,6 +1328,330 @@ _buildBridges() {
     }
 
     return 0;
+  }
+
+_buildGreenDistricts() {
+    if (!this.cityGroup || !Array.isArray(this.blockCenters)) return;
+
+    const grassMat = new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.9 });
+    const sandMat = new THREE.MeshStandardMaterial({ color: 0xfde68a, roughness: 0.92 });
+    const flowerMat = new THREE.MeshBasicMaterial({ color: 0xf43f5e });
+    const benchMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.7 });
+    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5c3a21, roughness: 0.85 });
+    const leafMat = new THREE.MeshStandardMaterial({ color: 0x16a34a, roughness: 0.8 });
+    const frondMat = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.75 });
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.65 });
+    const roofMat = new THREE.MeshStandardMaterial({ color: 0xb91c1c, roughness: 0.7 });
+    const winMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+
+    const yardGeo = new THREE.PlaneGeometry(WORLD_CFG.blockSize - 3, WORLD_CFG.blockSize - 3);
+    yardGeo.rotateX(-Math.PI * 0.5);
+    const trunkGeo = new THREE.CylinderGeometry(0.22, 0.34, 3.2, 6);
+    const leafGeo = new THREE.ConeGeometry(1.7, 3.6, 6);
+    const palmTrunkGeo = new THREE.CylinderGeometry(0.18, 0.3, 5.2, 6);
+    const frondGeo = new THREE.ConeGeometry(2.1, 0.85, 5);
+    const benchGeo = new THREE.BoxGeometry(1.8, 0.45, 0.65);
+    const flowerGeo = new THREE.BoxGeometry(0.45, 0.25, 0.45);
+    const houseBodyGeo = new THREE.BoxGeometry(5.6, 3.4, 5.2);
+    const houseRoofGeo = new THREE.ConeGeometry(4.4, 2.2, 4);
+    const houseWinGeo = new THREE.BoxGeometry(0.9, 0.8, 0.14);
+
+    const maxIdx = Math.max(1, WORLD_CFG.blocksPerSide - 1);
+    let placed = 0;
+
+    for (let i = 0; i < this.blockCenters.length && placed < 260; i++) {
+      const b = this.blockCenters[i];
+      const nx = b.bx / maxIdx;
+      const nz = b.bz / maxIdx;
+
+      const isBeach = nz > 0.72 && nx > 0.15 && nx < 0.85;
+      const isSuburbs = !isBeach && nx < 0.45 && nz < 0.65 && (b.bx + b.bz) % 2 === 0;
+      if (!isBeach && !isSuburbs) continue;
+
+      const yard = new THREE.Mesh(yardGeo, isBeach ? sandMat : grassMat);
+      yard.position.set(b.x, WORLD_CFG.sidewalkHeight + 0.03, b.z);
+      yard.receiveShadow = true;
+      this.cityGroup.add(yard);
+      placed++;
+
+      if (isBeach) {
+        for (let p = 0; p < 3 && placed < 260; p++) {
+          const px = b.x + randRange(-12, 12);
+          const pz = b.z + randRange(-12, 12);
+          const trunk = new THREE.Mesh(palmTrunkGeo, trunkMat);
+          trunk.position.set(px, WORLD_CFG.sidewalkHeight + 2.6, pz);
+          trunk.castShadow = true;
+          this.cityGroup.add(trunk);
+
+          const fronds = new THREE.Mesh(frondGeo, frondMat);
+          fronds.position.set(px, WORLD_CFG.sidewalkHeight + 5.3, pz);
+          fronds.castShadow = true;
+          this.cityGroup.add(fronds);
+          placed += 2;
+        }
+      } else {
+        for (const [hx, hz] of [
+          [-9.5, -8.5],
+          [9.5, 8.5]
+        ]) {
+          if (placed >= 256) break;
+          const house = new THREE.Group();
+          house.position.set(b.x + hx, WORLD_CFG.sidewalkHeight, b.z + hz);
+
+          const body = new THREE.Mesh(houseBodyGeo, wallMat);
+          body.position.y = 1.7;
+          body.castShadow = true;
+          body.receiveShadow = true;
+          house.add(body);
+
+          const roof = new THREE.Mesh(houseRoofGeo, roofMat);
+          roof.position.y = 4.5;
+          roof.rotation.y = Math.PI * 0.25;
+          roof.castShadow = true;
+          house.add(roof);
+
+          const win = new THREE.Mesh(houseWinGeo, winMat);
+          win.position.set(0, 1.9, 2.64);
+          house.add(win);
+
+          this.cityGroup.add(house);
+          this.colliders.push({
+            minX: b.x + hx - 2.9,
+            maxX: b.x + hx + 2.9,
+            minZ: b.z + hz - 2.7,
+            maxZ: b.z + hz + 2.7
+          });
+          placed += 3;
+        }
+
+        const tree = new THREE.Mesh(leafGeo, leafMat);
+        tree.position.set(b.x + 8.5, WORLD_CFG.sidewalkHeight + 4.2, b.z - 8.5);
+        tree.castShadow = true;
+        this.cityGroup.add(tree);
+
+        const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+        trunk.position.set(b.x + 8.5, WORLD_CFG.sidewalkHeight + 1.6, b.z - 8.5);
+        this.cityGroup.add(trunk);
+
+        const bench = new THREE.Mesh(benchGeo, benchMat);
+        bench.position.set(b.x - 8.5, WORLD_CFG.sidewalkHeight + 0.25, b.z + 9.5);
+        this.cityGroup.add(bench);
+
+        const flower = new THREE.Mesh(flowerGeo, flowerMat);
+        flower.position.set(b.x - 6.5, WORLD_CFG.sidewalkHeight + 0.14, b.z + 9.5);
+        this.cityGroup.add(flower);
+        placed += 4;
+      }
+    }
+  }
+
+  _buildDesertAirport() {
+    if (!this.cityGroup) return;
+
+    const span = WORLD_CFG.gridSpan || 560;
+    const half = WORLD_CFG.halfSpan || span * 0.5;
+    const sandMat = new THREE.MeshStandardMaterial({ color: 0xeab308, roughness: 0.94 });
+    const cactusMat = new THREE.MeshStandardMaterial({ color: 0x16a34a, roughness: 0.75 });
+    const tarmacMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.85 });
+    const stripeMat = new THREE.MeshBasicMaterial({ color: 0xf8fafc });
+    const hangarMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.6, metalness: 0.3 });
+    const planeMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.35, metalness: 0.4 });
+
+    const desertPad = new THREE.Mesh(new THREE.PlaneGeometry(96, 96), sandMat);
+    desertPad.rotation.x = -Math.PI * 0.5;
+    desertPad.position.set(-half + 48, 0.03, half - 48);
+    desertPad.receiveShadow = true;
+    this.cityGroup.add(desertPad);
+
+    const cactusGeo = new THREE.CylinderGeometry(0.45, 0.55, 3.8, 7);
+    for (let i = 0; i < 16; i++) {
+      const c = new THREE.Mesh(cactusGeo, cactusMat);
+      c.position.set(
+        -half + 14 + (i % 4) * 20,
+        1.9,
+        half - 14 - Math.floor(i / 4) * 20
+      );
+      c.castShadow = true;
+      this.cityGroup.add(c);
+    }
+
+    const ax = half - 54;
+    const az = -half + 54;
+    const runway = new THREE.Mesh(new THREE.BoxGeometry(18, 0.08, 110), tarmacMat);
+    runway.position.set(ax, 0.04, az);
+    runway.receiveShadow = true;
+    this.cityGroup.add(runway);
+
+    for (let z = -42; z <= 42; z += 14) {
+      const dash = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 5.5), stripeMat);
+      dash.rotation.x = -Math.PI * 0.5;
+      dash.position.set(ax, 0.09, az + z);
+      this.cityGroup.add(dash);
+    }
+
+    for (const hOff of [-16, 16]) {
+      const hangar = new THREE.Mesh(new THREE.BoxGeometry(14, 7, 18), hangarMat);
+      hangar.position.set(ax + 20, 3.5, az + hOff);
+      hangar.castShadow = true;
+      this.cityGroup.add(hangar);
+
+      this.colliders.push({
+        minX: ax + 13,
+        maxX: ax + 27,
+        minZ: az + hOff - 9,
+        maxZ: az + hOff + 9
+      });
+    }
+
+    for (let p = 0; p < 2; p++) {
+      const plane = new THREE.Group();
+      const fuselage = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.1, 9.5, 10), planeMat);
+      fuselage.rotation.x = Math.PI * 0.5;
+      plane.add(fuselage);
+
+      const wing = new THREE.Mesh(new THREE.BoxGeometry(11, 0.25, 2.2), planeMat);
+      wing.position.set(0, 0.1, 0.5);
+      plane.add(wing);
+
+      const tail = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.2, 1.4), planeMat);
+      tail.position.set(0, 0.3, 4.1);
+      plane.add(tail);
+
+      plane.position.set(ax - 2 + p * 4, 1.15, az - 18 + p * 36);
+      this.cityGroup.add(plane);
+    }
+  }
+
+  _buildFuelStation() {
+    if (!this.cityGroup) return;
+
+    const streets = Array.isArray(this.streetCoords) && this.streetCoords.length > 0 ? this.streetCoords : [0];
+    const midIdx = Math.floor(streets.length * 0.5);
+    const sx = (streets[midIdx] || 0) + (WORLD_CFG.roadWidth || 14) * 0.5 + 8;
+    const sz = (streets[Math.max(0, midIdx - 1)] || 0) + 12;
+
+    this.fuelStation = { x: sx, z: sz };
+
+    const group = new THREE.Group();
+    group.position.set(sx, 0, sz);
+
+    const canopyMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.35, metalness: 0.4 });
+    const pillarMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.5 });
+    const pumpMat = new THREE.MeshStandardMaterial({ color: 0x0ea5e9, roughness: 0.4 });
+    const shopMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.65 });
+
+    const canopy = new THREE.Mesh(new THREE.BoxGeometry(12, 0.6, 9), canopyMat);
+    canopy.position.set(0, 4.4, 0);
+    canopy.castShadow = true;
+    group.add(canopy);
+
+    for (const [px, pz] of [
+      [-4.8, -3.4],
+      [4.8, -3.4],
+      [-4.8, 3.4],
+      [4.8, 3.4]
+    ]) {
+      const pillar = new THREE.Mesh(new THREE.BoxGeometry(0.5, 4.4, 0.5), pillarMat);
+      pillar.position.set(px, 2.2, pz);
+      group.add(pillar);
+    }
+
+    for (const pmx of [-2.4, 2.4]) {
+      const pump = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.8, 1.1), pumpMat);
+      pump.position.set(pmx, 0.9, 0);
+      pump.castShadow = true;
+      group.add(pump);
+
+      this.colliders.push({
+        minX: sx + pmx - 0.65,
+        maxX: sx + pmx + 0.65,
+        minZ: sz - 0.65,
+        maxZ: sz + 0.65
+      });
+    }
+
+    const shop = new THREE.Mesh(new THREE.BoxGeometry(8, 3.6, 6), shopMat);
+    shop.position.set(0, 1.8, -9.5);
+    shop.castShadow = true;
+    group.add(shop);
+
+    this.colliders.push({
+      minX: sx - 4.1,
+      maxX: sx + 4.1,
+      minZ: sz - 12.6,
+      maxZ: sz - 6.4
+    });
+
+    const radius = (typeof FUEL !== 'undefined' && FUEL.stationRadius) || 11;
+    const ringGeo = new THREE.RingGeometry(radius - 0.7, radius, 32);
+    ringGeo.rotateX(-Math.PI * 0.5);
+    this.fuelMarkerMat = new THREE.MeshBasicMaterial({
+      color: 0x22d3ee,
+      transparent: true,
+      opacity: 0.65,
+      side: THREE.DoubleSide
+    });
+    const marker = new THREE.Mesh(ringGeo, this.fuelMarkerMat);
+    marker.position.set(0, 0.06, 0);
+    group.add(marker);
+
+    this.cityGroup.add(group);
+  }
+
+  _updateFuelStation(dt, playerPos = { x: 0, z: 0 }) {
+    if (!this.fuelStation) return false;
+    const radius = (typeof FUEL !== 'undefined' && FUEL.stationRadius) || 11;
+    const dist = Math.hypot((playerPos.x || 0) - this.fuelStation.x, (playerPos.z || 0) - this.fuelStation.z);
+    const inside = dist <= radius;
+
+    if (this.fuelMarkerMat) {
+      const pulse = 0.45 + 0.25 * Math.sin((this.time || 0) * (inside ? 9 : 3));
+      this.fuelMarkerMat.color.setHex(inside ? 0x4ade80 : 0x22d3ee);
+      this.fuelMarkerMat.opacity = pulse;
+    }
+
+    return inside;
+  }
+
+  _buildBetterBridges() {
+    if (!this.bridgeGroup || !Array.isArray(this.bridgeGroup.children)) return;
+
+    const medianMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
+    const poleMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.5, metalness: 0.6 });
+    const bulbMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
+    const arrowMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+
+    const deckH = (typeof TERRAIN !== 'undefined' && TERRAIN.bridgeHeight) || 9;
+    const roadW = WORLD_CFG.roadWidth || 14;
+
+    for (let i = 0; i < this.bridgeGroup.children.length; i++) {
+      const child = this.bridgeGroup.children[i];
+      if (!child || !child.isGroup) continue;
+
+      const isElevated = child.position.y > 1 || child.children.some((m) => m.position && m.position.y >= deckH - 1);
+      if (isElevated) {
+        const median = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.25, 36), medianMat);
+        median.position.set(0, deckH + 0.4, 0);
+        child.add(median);
+
+        for (const lz of [-12, 12]) {
+          const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 4.5, 6), poleMat);
+          pole.position.set(roadW * 0.44, deckH + 2.25, lz);
+          child.add(pole);
+
+          const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.28, 8, 8), bulbMat);
+          bulb.position.set(roadW * 0.44, deckH + 4.55, lz);
+          child.add(bulb);
+        }
+      } else {
+        for (const az of [-14, 14]) {
+          const chev = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.2), arrowMat);
+          chev.rotation.x = -Math.PI * 0.5;
+          chev.position.set(0, 0.04, az);
+          child.add(chev);
+        }
+      }
+    }
   }
 
   getColliders() {
