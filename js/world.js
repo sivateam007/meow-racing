@@ -365,15 +365,20 @@ _buildWindowTextures() {
       metalness: 0.2
     });
 
+    const innerEdge = (WORLD_CFG.halfSpan || 300) + 60;
+
     for (let i = 0; i < WORLD_CFG.skylineCount; i++) {
-      const angle = (i / WORLD_CFG.skylineCount) * Math.PI * 2 + randRange(-0.04, 0.04);
-      const radius = randRange(WORLD_CFG.skylineRadiusMin, WORLD_CFG.skylineRadiusMax);
       const w = randRange(14, 28);
       const d = randRange(14, 28);
       const h = randRange(24, 82);
+      const along = randRange(-innerEdge, innerEdge);
+      const out = innerEdge + randRange(0, 70);
+      const side = i % 4;
+      const sx = side === 0 ? along : side === 1 ? out : side === 2 ? -along : -out;
+      const sz = side === 0 ? -out : side === 1 ? along : side === 2 ? out : -along;
 
       const tower = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), skylineMat);
-      tower.position.set(Math.cos(angle) * radius, h * 0.5 - 2, Math.sin(angle) * radius);
+      tower.position.set(sx, h * 0.5 - 2, sz);
       tower.rotation.y = randRange(-0.25, 0.25);
       this.cityGroup.add(tower);
     }

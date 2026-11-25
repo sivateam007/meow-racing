@@ -69,7 +69,7 @@ export class Game {
     const width = window.innerWidth || 1280;
     const height = window.innerHeight || 720;
 
-    this.camera = new THREE.PerspectiveCamera(60, width / height, 0.4, 450);
+    this.camera = new THREE.PerspectiveCamera(60, width / height, 0.4, 900);
     this.camera.position.set(
       CAR_CFG.cameraOffset.x,
       CAR_CFG.cameraOffset.y,
