@@ -213,6 +213,112 @@ export class Game {
         this._updateHud();
       });
     });
+
+    const helpBtn = document.getElementById('help-button');
+    if (helpBtn) {
+      helpBtn.addEventListener('click', () => {
+        const panel = document.getElementById('help-panel');
+        if (panel) panel.classList.remove('hidden');
+      });
+    }
+
+    const settingsBtn = document.getElementById('settings-button');
+    if (settingsBtn) {
+      settingsBtn.addEventListener('click', () => {
+        if (typeof this._openSettings === 'function') this._openSettings();
+        const panel = document.getElementById('settings-panel');
+        if (panel) panel.classList.remove('hidden');
+      });
+    }
+
+    const resumeBtn = document.getElementById('resume-button');
+    if (resumeBtn) {
+      resumeBtn.addEventListener('click', () => {
+        this.paused = false;
+        const pOv = document.getElementById('pause-overlay');
+        if (pOv) pOv.classList.add('hidden');
+      });
+    }
+
+    const touchTaxi = document.getElementById('touch-taxi');
+    if (touchTaxi) {
+      touchTaxi.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.taxiMode = !this.taxiMode;
+        if (!this.taxiMode) {
+          this.taxiPassenger = null;
+          if (this.world) this.world.taxiTarget = null;
+        }
+        this._updateHud();
+      });
+    }
+
+    const touchShop = document.getElementById('touch-shop');
+    if (touchShop) {
+      touchShop.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const shopPanel = document.getElementById('shop-panel-vehicles');
+        if (shopPanel) shopPanel.classList.toggle('hidden');
+      });
+    }
+
+    const touchPause = document.getElementById('touch-pause');
+    if (touchPause) {
+      touchPause.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.paused = !this.paused;
+        const pOv = document.getElementById('pause-overlay');
+        if (pOv) pOv.classList.toggle('hidden', !this.paused);
+      });
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'KeyP') {
+        this.paused = !this.paused;
+        const pOv = document.getElementById('pause-overlay');
+        if (pOv) pOv.classList.toggle('hidden', !this.paused);
+      }
+    });
+  }
+
+_applyLayoutPreset(preset = 'compact') {
+    const valid = ['compact', 'large', 'left', 'right'];
+    const chosen = valid.includes(preset) ? preset : 'compact';
+    this.controlLayout = chosen;
+    if (document.body) {
+      document.body.dataset.layout = chosen;
+    }
+    try {
+      localStorage.setItem('meow_open_city_layout', chosen);
+    } catch (_) {}
+  }
+
+  _openSettings() {
+    let saved = this.controlLayout;
+    if (!saved) {
+      try {
+        saved = localStorage.getItem('meow_open_city_layout') || 'compact';
+      } catch (_) {
+        saved = 'compact';
+      }
+    }
+    this._applyLayoutPreset(saved);
+    const panel = document.getElementById('settings-panel');
+    if (panel) panel.classList.remove('hidden');
+
+    panel?.querySelectorAll('[data-layout]').forEach((btn) => {
+      btn.onclick = () => {
+        this._applyLayoutPreset(btn.getAttribute('data-layout'));
+      };
+    });
+  }
+
+  _closeSettings() {
+    const panel = document.getElementById('settings-panel');
+    if (panel) panel.classList.add('hidden');
   }
 
   startGame() {
@@ -421,7 +527,7 @@ export class Game {
       if (this.world.raceActive) {
         const cpNum = Math.min((this.world.raceIndex || 0) + 1, (this.world.raceCheckpoints && this.world.raceCheckpoints.length) || 3);
         const cpTotal = (this.world.raceCheckpoints && this.world.raceCheckpoints.length) || 3;
-        missionEl.textContent = `RACE CP ${cpNum}/${cpTotal} • ${Math.ceil(this.world.raceTime || 0)}s`;
+        missionEl.textContent = `RACE CP ${cpNum}/${cpTotal} â€¢ ${Math.ceil(this.world.raceTime || 0)}s`;
       } else {
         missionEl.textContent = 'MISSION: VISIT OIL CO';
       }
@@ -434,7 +540,7 @@ export class Game {
     const wantedEl = document.getElementById('hud-wanted');
     if (wantedEl) {
       const stars = Math.max(0, Math.min(SURVIVAL.wantedMax, Math.round(this.wanted || 0)));
-      wantedEl.textContent = '★'.repeat(stars) + '☆'.repeat(SURVIVAL.wantedMax - stars);
+      wantedEl.textContent = 'â˜…'.repeat(stars) + 'â˜†'.repeat(SURVIVAL.wantedMax - stars);
     }
     if (this.speedEl) {
       const kmh = Math.round(Math.abs(this.car.speed || 0) * 3.6);
@@ -563,7 +669,7 @@ export class Game {
         : false;
       if (nearStation) {
         this.fuel = clamp(this.fuel + (FUEL.refillRate || 55) * dt, 0, maxFuel);
-      } else {
+      } else if (Math.abs((this.car && this.car.speed) || 0) > 0.5) {
         this.fuel = clamp(this.fuel - (FUEL.drainPerSec || 0.35) * dt, 0, maxFuel);
       }
     }

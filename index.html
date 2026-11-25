@@ -93,6 +93,11 @@
       <button id="touch-brake" class="touch-btn touch-brake" type="button" aria-label="Brake or Reverse">REV</button>
       <button id="touch-gas" class="touch-btn touch-gas" type="button" aria-label="Accelerate">GAS</button>
     </div>
+    <div class="touch-group-actions">
+      <button id="touch-taxi" class="touch-btn touch-action-btn" type="button" aria-label="Taxi Mode">TAXI</button>
+      <button id="touch-shop" class="touch-btn touch-action-btn" type="button" aria-label="Vehicle Shop">SHOP</button>
+      <button id="touch-pause" class="touch-btn touch-action-btn" type="button" aria-label="Pause Game">PAUSE</button>
+    </div>
   </div>
 
   <div id="menu-overlay" class="overlay">
@@ -113,6 +118,35 @@
       <p class="game-subtitle">City traffic is waiting.</p>
       <div class="overlay-actions">
         <button id="resume-button" class="primary-button" type="button">RESUME</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="help-panel" class="overlay hidden">
+    <div class="overlay-card">
+      <h2 class="pause-title">CONTROLS &amp; GUIDE</h2>
+      <p class="game-subtitle">
+        Drive: W/A/S/D or Arrows • Drift: Space • Taxi: T • Shop: B • Pause: P.<br />
+        Refuel at the Oil Co station, pick up pedestrians for fares, and unlock vehicles in the shop.
+      </p>
+      <div class="overlay-actions">
+        <button type="button" class="secondary-button" onclick="document.getElementById('help-panel').classList.add('hidden')">CLOSE</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="settings-panel" class="overlay hidden">
+    <div class="overlay-card">
+      <h2 class="pause-title">SETTINGS &amp; LAYOUT</h2>
+      <p class="game-subtitle">Choose mobile touch layout preset:</p>
+      <div class="overlay-actions">
+        <button type="button" class="secondary-button" data-layout="compact">COMPACT</button>
+        <button type="button" class="secondary-button" data-layout="large">LARGE</button>
+        <button type="button" class="secondary-button" data-layout="left">LEFT FOCUS</button>
+        <button type="button" class="secondary-button" data-layout="right">RIGHT FOCUS</button>
+      </div>
+      <div class="overlay-actions" style="margin-top:16px;">
+        <button type="button" class="primary-button" onclick="document.getElementById('settings-panel').classList.add('hidden')">DONE</button>
       </div>
     </div>
   </div>

@@ -671,3 +671,54 @@ body {
   transform: scale(0.95);
   border-color: #00f5d4;
 }
+/* === MOBILE ACTION BUTTONS + SETTINGS (Gemini) === */
+#touch-taxi,
+#touch-shop,
+#touch-pause {
+  width: 58px;
+  height: 58px;
+  min-width: 54px;
+  min-height: 54px;
+  font-size: 10px;
+}
+
+#touch-taxi {
+  border-color: #facc15;
+  color: #fef08a;
+}
+
+#touch-shop {
+  border-color: #00f5d4;
+  color: #a5f3fc;
+}
+
+#touch-pause {
+  border-color: #f472b6;
+  color: #fbcfe8;
+}
+
+body[data-layout="large"] .touch-btn {
+  width: 78px;
+  height: 78px;
+  min-width: 76px;
+  min-height: 76px;
+  font-size: 13px;
+}
+
+body[data-layout="compact"] .touch-btn {
+  width: 58px;
+  height: 58px;
+  min-width: 54px;
+  min-height: 54px;
+  font-size: 10px;
+}
+
+body[data-layout="left"] .touch-group-left {
+  transform: scale(1.12);
+  transform-origin: bottom left;
+}
+
+body[data-layout="right"] .touch-group-right {
+  transform: scale(1.12);
+  transform-origin: bottom right;
+}
