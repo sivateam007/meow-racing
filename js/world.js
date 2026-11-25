@@ -44,37 +44,71 @@ export class World {
     this.buildPedestrians();
   }
 
-  _buildWindowTextures() {
+_buildWindowTextures() {
     const palettes = [
-      { wall: '#334155', lit: '#fde68a', dark: '#0f172a' },
-      { wall: '#1e3a5f', lit: '#bae6fd', dark: '#09192c' },
-      { wall: '#4a352f', lit: '#fed7aa', dark: '#1c120f' },
-      { wall: '#2e3a3f', lit: '#bbf7d0', dark: '#0d171a' }
+      { wallTop: '#334155', wallBot: '#1e293b', frame: '#0f172a', lit: ['#fef08a', '#fde047', '#bae6fd'], dark: '#0b1120', blind: '#475569' },
+      { wallTop: '#475569', wallBot: '#334155', frame: '#1e293b', lit: ['#fde68a', '#fed7aa', '#a5f3fc'], dark: '#111827', blind: '#64748b' },
+      { wallTop: '#293548', wallBot: '#172033', frame: '#090d16', lit: ['#fef9c3', '#7dd3fc', '#fbcfe8'], dark: '#070c18', blind: '#334155' },
+      { wallTop: '#52525b', wallBot: '#27272a', frame: '#18181b', lit: ['#fde047', '#e0f2fe', '#fed7aa'], dark: '#09090b', blind: '#3f3f46' }
     ];
 
-    for (const pal of palettes) {
+    this._windowTextureCache = palettes.map((pal, pIdx) => {
       const canvas = document.createElement('canvas');
       canvas.width = 128;
       canvas.height = 128;
       const ctx = canvas.getContext('2d');
 
-      ctx.fillStyle = pal.wall;
+      const grad = ctx.createLinearGradient(0, 0, 0, 128);
+      grad.addColorStop(0, pal.wallTop);
+      grad.addColorStop(1, pal.wallBot);
+      ctx.fillStyle = grad;
       ctx.fillRect(0, 0, 128, 128);
+
+      // Subtle vertical grime streaks
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.14)';
+      for (let gx = 6 + ((pIdx * 19) % 24); gx < 124; gx += 28) {
+        ctx.fillRect(gx, 0, 3, 128);
+      }
 
       const cols = 4;
       const rows = 8;
-      const padX = 8;
-      const padY = 5;
-      const winW = (128 - padX * (cols + 1)) / cols;
-      const winH = (128 - padY * (rows + 1)) / rows;
+      const cellW = 128 / cols;
+      const cellH = 128 / rows;
+      const winW = 18;
+      const winH = 9;
 
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
-          const x = padX + c * (winW + padX);
-          const y = padY + r * (winH + padY);
-          const isLit = Math.random() > 0.45;
-          ctx.fillStyle = isLit ? pal.lit : pal.dark;
-          ctx.fillRect(x, y, winW, winH);
+          const wx = Math.round(c * cellW + (cellW - winW) * 0.5);
+          const wy = Math.round(r * cellH + (cellH - winH) * 0.5);
+          const hash = (r * 7 + c * 13 + pIdx * 5) % 11;
+
+          // Window frame
+          ctx.fillStyle = pal.frame;
+          ctx.fillRect(wx - 1, wy - 1, winW + 2, winH + 2);
+
+          if (hash < 4) {
+            ctx.fillStyle = pal.lit[(r + c + pIdx) % pal.lit.length];
+            ctx.fillRect(wx, wy, winW, winH);
+            // Half blind / curtain on select lit panes
+            if (hash === 1) {
+              ctx.fillStyle = pal.blind;
+              ctx.fillRect(wx, wy, winW, Math.round(winH * 0.42));
+            }
+          } else {
+            ctx.fillStyle = pal.dark;
+            ctx.fillRect(wx, wy, winW, winH);
+          }
+
+          // Center mullion
+          ctx.fillStyle = pal.frame;
+          ctx.fillRect(wx + Math.floor(winW * 0.5), wy, 1, winH);
+
+          // Small AC ledge under select windows
+          if (hash === 3 && c % 2 === 1) {
+            ctx.fillStyle = 'rgba(203, 213, 225, 0.45)';
+            ctx.fillRect(wx + 2, wy + winH + 1, winW - 4, 2);
+          }
         }
       }
 
@@ -82,8 +116,10 @@ export class World {
       tex.wrapS = THREE.RepeatWrapping;
       tex.wrapT = THREE.RepeatWrapping;
       tex.colorSpace = THREE.SRGBColorSpace;
-      this._windowTextureCache.push(tex);
-    }
+      return tex;
+    });
+
+    return this._windowTextureCache;
   }
 
   buildCity() {
@@ -305,6 +341,8 @@ export class World {
     this._buildNaturalHomes();
     this._decorateBuildings();
     this._addStreetDetails();
+    this._buildRoadDetails();
+    this._buildSkyDome();
     this._clearRoadColliders();
   }
 
@@ -898,6 +936,170 @@ export class World {
     this._updateFuelStation(safeDt, playerPos);
     this._updateTrain(safeDt);
     this._updateTaxiMarker(safeDt);
+  }
+
+  _buildRoadDetails() {
+    if (!this.cityGroup || !Array.isArray(this.streetCoords) || this.streetCoords.length === 0) return;
+
+    const patchMat = new THREE.MeshStandardMaterial({ color: 0x11151f, roughness: 0.95, metalness: 0.05 });
+    const crackMat = new THREE.MeshBasicMaterial({ color: 0x090c14 });
+    const manholeMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.55, metalness: 0.75 });
+    const bayMat = new THREE.MeshBasicMaterial({ color: 0xe2e8f0 });
+    const arrowMat = new THREE.MeshBasicMaterial({ color: 0xf8fafc });
+
+    const patchGeo = new THREE.PlaneGeometry(3.4, 2.2);
+    patchGeo.rotateX(-Math.PI * 0.5);
+    const crackGeo = new THREE.PlaneGeometry(0.14, 2.8);
+    crackGeo.rotateX(-Math.PI * 0.5);
+    const manholeGeo = new THREE.CylinderGeometry(0.58, 0.58, 0.03, 12);
+    const bayGeo = new THREE.PlaneGeometry(0.18, 2.6);
+    bayGeo.rotateX(-Math.PI * 0.5);
+    const arrowGeo = new THREE.ConeGeometry(0.55, 1.4, 3);
+    arrowGeo.rotateX(-Math.PI * 0.5);
+
+    const roadW = WORLD_CFG.roadWidth || 14;
+    const laneOff = roadW * 0.25;
+    let added = 0;
+    const cap = 260;
+
+    for (let i = 0; i < this.streetCoords.length && added < cap; i++) {
+      const s = this.streetCoords[i];
+
+      for (let j = 0; j < this.streetCoords.length && added < cap; j += 2) {
+        const ix = this.streetCoords[j];
+        const iz = s;
+
+        const mh = new THREE.Mesh(manholeGeo, manholeMat);
+        mh.position.set(ix + laneOff, 0.032, iz + laneOff);
+        this.cityGroup.add(mh);
+        added++;
+
+        if (added < cap) {
+          const patch = new THREE.Mesh(patchGeo, patchMat);
+          patch.position.set(ix + 14, 0.031, iz - laneOff);
+          patch.rotation.y = (i + j) * 0.35;
+          this.cityGroup.add(patch);
+          added++;
+        }
+
+        if (added < cap && (i + j) % 3 === 0) {
+          const crack = new THREE.Mesh(crackGeo, crackMat);
+          crack.position.set(ix - 16, 0.033, iz + laneOff);
+          crack.rotation.z = 0.25;
+          this.cityGroup.add(crack);
+          added++;
+        }
+      }
+
+      if (added < cap) {
+        const bay = new THREE.Mesh(bayGeo, bayMat);
+        bay.position.set(s + roadW * 0.5 - 1.2, 0.032, 0);
+        this.cityGroup.add(bay);
+        added++;
+      }
+
+      if (added < cap && i % 2 === 1) {
+        const arr = new THREE.Mesh(arrowGeo, arrowMat);
+        arr.position.set(s - laneOff, 0.034, -18);
+        this.cityGroup.add(arr);
+        added++;
+      }
+    }
+  }
+
+  _buildSkyDome() {
+    if (!this.scene) return;
+    if (this._skyDomeGroup) {
+      this.scene.remove(this._skyDomeGroup);
+    }
+
+    const grp = new THREE.Group();
+    grp.renderOrder = -1;
+
+    const topCol = new THREE.Color(COLORS.skyDayTop ?? 0x38bdf8);
+    const botCol = new THREE.Color(COLORS.fogDay ?? 0x93c5fd);
+
+    const skyMat = new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      depthWrite: false,
+      uniforms: {
+        topColor: { value: topCol },
+        bottomColor: { value: botCol }
+      },
+      vertexShader: `
+        varying vec3 vWorldPos;
+        void main() {
+          vec4 wp = modelMatrix * vec4(position, 1.0);
+          vWorldPos = wp.xyz;
+          gl_Position = projectionMatrix * viewMatrix * wp;
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 topColor;
+        uniform vec3 bottomColor;
+        varying vec3 vWorldPos;
+        void main() {
+          float h = clamp(normalize(vWorldPos).y * 1.4, 0.0, 1.0);
+          vec3 col = mix(bottomColor, topColor, pow(h, 0.65));
+          gl_FragColor = vec4(col, 1.0);
+        }
+      `
+    });
+
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(390, 24, 16), skyMat);
+    dome.renderOrder = -1;
+    grp.add(dome);
+
+    const sunDisc = new THREE.Mesh(
+      new THREE.CircleGeometry(14, 20),
+      new THREE.MeshBasicMaterial({
+        color: 0xfffbeb,
+        fog: false,
+        depthWrite: false
+      })
+    );
+    sunDisc.position.set(140, 210, 120);
+    sunDisc.lookAt(0, 0, 0);
+    sunDisc.renderOrder = -1;
+    grp.add(sunDisc);
+
+    const cCanvas = document.createElement('canvas');
+    cCanvas.width = 128;
+    cCanvas.height = 128;
+    const cCtx = cCanvas.getContext('2d');
+    const grad = cCtx.createRadialGradient(64, 64, 8, 64, 64, 62);
+    grad.addColorStop(0, 'rgba(255, 255, 255, 0.55)');
+    grad.addColorStop(0.6, 'rgba(255, 255, 255, 0.22)');
+    grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    cCtx.fillStyle = grad;
+    cCtx.fillRect(0, 0, 128, 128);
+    const cloudTex = new THREE.CanvasTexture(cCanvas);
+    cloudTex.colorSpace = THREE.SRGBColorSpace;
+
+    const cloudMat = new THREE.SpriteMaterial({
+      map: cloudTex,
+      transparent: true,
+      opacity: 0.48,
+      depthWrite: false,
+      fog: false
+    });
+
+    const cloudCoords = [
+      [-110, 125, -90],
+      [95, 138, -120],
+      [-140, 118, 85],
+      [125, 132, 95]
+    ];
+    for (const [cx, cy, cz] of cloudCoords) {
+      const sp = new THREE.Sprite(cloudMat);
+      sp.position.set(cx, cy, cz);
+      sp.scale.set(68, 28, 1);
+      sp.renderOrder = -1;
+      grp.add(sp);
+    }
+
+    this._skyDomeGroup = grp;
+    this.scene.add(grp);
   }
 
   _buildOilDistrict() {

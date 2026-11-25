@@ -183,6 +183,9 @@ setDayNight(t = 0) {
       this.scene.background = skyCol;
       if (this.scene.fog) {
         this.scene.fog.color.copy(fogCol);
+        if (typeof this.scene.fog.density === 'number') {
+          this.scene.fog.density = lerp(0.0044, 0.0032, daylight);
+        }
       }
       this.scene.traverse((obj) => {
         if (!obj.isMesh || !obj.material) return;
@@ -190,7 +193,7 @@ setDayNight(t = 0) {
         for (let i = 0; i < mats.length; i++) {
           const m = mats[i];
           if (m && 'emissiveIntensity' in m && m.emissive && m.emissive.getHex() !== 0x000000) {
-            m.emissiveIntensity = lerp(1.45, 0.25, daylight);
+            m.emissiveIntensity = lerp(1.75, 0.22, daylight);
           }
         }
       });

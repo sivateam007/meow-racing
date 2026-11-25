@@ -203,6 +203,32 @@ replayable at reduced reward; coins/XP/missionsCompleted survive reload; zero co
 
 ---
 
+## Step 9 — GTA-SA-style graphics polish
+
+> LABEL PATCH 1 — game.js — REPLACEMENT for renderer setup in `_initScene()`.
+> Use `outputColorSpace = SRGBColorSpace`, pixel-ratio cap 1.75, `toneMappingExposure = 1.28`,
+> `useLegacyLights = false` when available. Keep `WebGLRenderer`/variable names.
+>
+> LABEL PATCH 2 — world.js — REPLACEMENT for `_buildWindowTextures()`.
+> Richer procedural facades: wall gradients, window frames/mullions, varied lit colors,
+> blinds/curtains, grime strips and AC ledges. Keep 4 palettes and `_windowTextureCache`.
+>
+> LABEL PATCH 3 — world.js — ADD-ONLY `_buildRoadDetails()`.
+> Bounded (~260) asphalt patches, cracks, manholes, parking bays, arrows, curbs. Call at end of `buildCity()`.
+>
+> LABEL PATCH 4 — world.js — ADD-ONLY `_buildSkyDome()`.
+> Gradient sky sphere with BackSide ShaderMaterial, sun disc, 4 cloud sprites. Call at end of `buildCity()`.
+>
+> LABEL PATCH 5 — css/style.css — ADD-ONLY subtle `body::before` color grading (contrast/saturate),
+> pointer-events none, mobile landscape safe.
+>
+> LABEL PATCH 6 — effects.js — small `setDayNight()` changes: fog density lerp(0.0044,0.0032,daylight)
+> and emissive lerp(1.75,0.22,daylight).
+
+**Acceptance:** visibly richer windows/road/sky, no shader or console errors, FPS stays playable.
+
+---
+
 ## Final validation checklist (run after every step)
 
 ```powershell
