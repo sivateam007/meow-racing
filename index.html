@@ -25,8 +25,6 @@
     </div>
   </div>
 
-  <div id="hud-taxi" class="hud-chip hud-taxi-chip">TAXI: OFF</div>
-  <div id="station-marker-label" class="station-marker-label">CENTRAL STATION</div>
   <div id="shop-panel-vehicles" class="shop-panel-vehicles hidden">
     <div class="shop-panel-header">CITY MOTORS SHOP <span style="font-size:10px;opacity:.7">[B to close]</span></div>
     <button type="button" data-vehicle="bike">BIKE - 400</button>
@@ -36,16 +34,10 @@
     <button type="button" data-vehicle="bus">BUS - 1800</button>
   </div>
 
-  <div class="hud">
-    <div id="hud-health" class="hud-health-bar">
-      <div id="hud-health-fill" class="hud-health-fill"></div>
-    </div>
-    <div id="hud-wanted" class="hud-wanted">☆☆☆☆☆</div>
-    <div id="hud-mission" class="hud-chip hud-mission">MISSION: VISIT OIL CO</div>
-
+<div class="hud">
     <div class="hud-top-left">
       <div class="minimap-card">
-        <canvas id="minimap" class="minimap" width="144" height="144"></canvas>
+        <canvas id="minimap" class="minimap" width="128" height="128"></canvas>
       </div>
       <div class="hud-chips-row">
         <div class="hud-chip hud-coin-pill">
@@ -53,16 +45,31 @@
           <span id="hud-coins" class="chip-value">0</span>
         </div>
         <div class="hud-chip">
+          <span class="chip-label">FUEL</span>
+          <span id="hud-fuel" class="chip-value">100%</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="hud-top-center">
+      <div class="hud-center-row">
+        <div class="hud-chip hud-time-pill">
           <span class="chip-label">TIME</span>
           <span id="hud-time" class="chip-value">00:00</span>
         </div>
-        <div id="hud-fuel" class="hud-chip hud-fuel-chip">100%</div>
+        <div id="hud-taxi" class="hud-chip hud-taxi-chip">TAXI: OFF</div>
+        <div id="hud-wanted" class="hud-wanted">☆☆☆☆☆</div>
       </div>
+      <div id="hud-mission" class="hud-chip hud-mission">EARN COINS VIA TAXI/RACE • OPEN SHOP FOR BIKE (400)</div>
+      <div id="station-marker-label" class="station-marker-label">CENTRAL STATION</div>
     </div>
 
     <div class="hud-top-right">
       <div id="hud-combo" class="hud-combo"></div>
-      <div class="hud-chip hud-time-pill">
+      <div id="hud-health" class="hud-health-bar">
+        <div id="hud-health-fill" class="hud-health-fill"></div>
+      </div>
+      <div class="hud-chip">
         <span class="chip-label">CITY</span>
         <span id="hud-level" class="chip-value">FREE ROAM</span>
       </div>
@@ -79,6 +86,8 @@
     <div id="desktop-hints" class="desktop-hints">
       <span><kbd>W/A/S/D</kbd> or <kbd>Arrows</kbd> Drive</span>
       <span><kbd>Space</kbd> Drift</span>
+      <span><kbd>T</kbd> Taxi</span>
+      <span><kbd>B</kbd> Shop</span>
       <span><kbd>P</kbd> Pause</span>
     </div>
   </div>
@@ -150,6 +159,8 @@
       </div>
     </div>
   </div>
+
+  <div id="toast"></div>
 
   <script type="module">
     import { Game } from './js/game.js';

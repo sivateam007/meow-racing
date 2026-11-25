@@ -198,10 +198,15 @@ export class Game {
         if (!vType || !SHOP || !SHOP.prices) return;
         const price = SHOP.prices[vType] ?? 500;
         if (!this.ownedVehicles) this.ownedVehicles = ['sedan'];
+        let purchased = false;
         if (!this.ownedVehicles.includes(vType)) {
-          if ((this.coins || 0) < price) return;
+          if ((this.coins || 0) < price) {
+            if (typeof this._toast === 'function') this._toast(`NEED ${price - (this.coins || 0)} MORE COINS`);
+            return;
+          }
           this.coins -= price;
           this.ownedVehicles.push(vType);
+          purchased = true;
           try {
             localStorage.setItem('meow_open_city_vehicles', JSON.stringify(this.ownedVehicles));
           } catch (_) {}
@@ -209,6 +214,11 @@ export class Game {
         this.currentVehicle = vType;
         if (this.car && typeof this.car.setVehicleType === 'function') {
           this.car.setVehicleType(vType);
+        }
+        if (typeof this._toast === 'function') {
+          this._toast(purchased && vType === 'bike' ? 'BIKE UNLOCKED - PRESS GAS TO RIDE'
+            : purchased ? `${vType.toUpperCase()} UNLOCKED - READY TO DRIVE`
+            : `${vType.toUpperCase()} SELECTED`);
         }
         this._updateHud();
       });
@@ -506,60 +516,144 @@ _applyLayoutPreset(preset = 'compact') {
     }
   }
 
+_toast(msg, ms = 1800) {
+    if (!document.body) return;
+    let el = document.getElementById('toast');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'toast';
+      document.body.appendChild(el);
+    }
+    el.textContent = String(msg || '');
+    el.style.opacity = '1';
+    if (typeof anime === 'function') {
+      anime.remove(el);
+      anime({
+        targets: el,
+        opacity: [0, 1, 1, 0],
+        translateY: [-8, 0, 0, -6],
+        duration: ms,
+        easing: 'easeOutQuad',
+        complete: () => {
+          if (el && el.parentNode) el.parentNode.removeChild(el);
+        }
+      });
+    } else {
+      setTimeout(() => {
+        if (el && el.parentNode) el.parentNode.removeChild(el);
+      }, ms);
+    }
+  }
+
+  _pickupHint(playerPos = { x: 0, z: 0 }) {
+    if (!this.taxiMode) return 'EARN COINS VIA TAXI/RACE • OPEN SHOP FOR BIKE (400)';
+    if (this.taxiPassenger && this.taxiTarget) {
+      const dist = Math.round(Math.hypot((playerPos.x || 0) - this.taxiTarget.x, (playerPos.z || 0) - this.taxiTarget.z));
+      return `FARE TO MARKER (${dist}m)`;
+    }
+    const radius = (typeof TAXI !== 'undefined' && TAXI.pickupRadius) || 8;
+    const peds = this.world && Array.isArray(this.world.pedPool) ? this.world.pedPool : [];
+    for (let i = 0; i < peds.length; i++) {
+      const ped = peds[i];
+      if (!ped || !ped.root || !ped.root.position) continue;
+      const d = Math.hypot((playerPos.x || 0) - ped.root.position.x, (playerPos.z || 0) - ped.root.position.z);
+      if (d <= radius * 1.4) {
+        return 'PICKUP AVAILABLE — STOP NEAR PEDESTRIAN';
+      }
+    }
+    return 'DRIVE NEAR A PEDESTRIAN TO PICK UP';
+  }
+
   _updateHud() {
-    const taxiEl = document.getElementById('hud-taxi');
-    if (taxiEl) {
-      taxiEl.textContent = this.taxiMode ? (this.taxiPassenger ? 'TAXI: FARE' : 'TAXI: ON') : 'TAXI: OFF';
-      taxiEl.classList.toggle('active', Boolean(this.taxiMode));
+    const coinsEl = document.getElementById('hud-coins');
+    if (coinsEl) {
+      coinsEl.textContent = String(Math.floor(this.coins ?? 0));
     }
-    const mEl0 = document.getElementById('hud-mission');
-    if (mEl0 && this.taxiMode) {
-      mEl0.textContent = this.taxiPassenger ? 'TAXI: DROP PASSENGER AT MARKER' : 'TAXI: DRIVE NEAR PEDESTRIAN';
+
+    const timeEl = document.getElementById('hud-time');
+    if (timeEl) {
+      const totalSec = Math.max(0, Math.floor(this.elapsedTime ?? this.time ?? 0));
+      const mins = String(Math.floor(totalSec / 60)).padStart(2, '0');
+      const secs = String(totalSec % 60).padStart(2, '0');
+      timeEl.textContent = `${mins}:${secs}`;
     }
+
+    const speedEl = document.getElementById('hud-speed-big');
+    if (speedEl && this.car) {
+      const kmh = Math.round(Math.abs(this.car.speed ?? 0) * 3.6);
+      speedEl.textContent = String(kmh);
+    }
+
+    const comboEl = document.getElementById('hud-combo');
+    if (comboEl) {
+      const combo = this.combo ?? 0;
+      comboEl.textContent = combo > 1 ? `${combo}X` : '';
+    }
+
+    const hpFill = document.getElementById('hud-health-fill');
+    if (hpFill) {
+      const maxHp = (typeof SURVIVAL !== 'undefined' && SURVIVAL.maxHealth) || 100;
+      const curHp = typeof this.health === 'number' ? this.health : maxHp;
+      hpFill.style.width = `${clamp((curHp / maxHp) * 100, 0, 100)}%`;
+    }
+
+    const wantedEl = document.getElementById('hud-wanted');
+    if (wantedEl) {
+      const maxStars = (typeof SURVIVAL !== 'undefined' && SURVIVAL.wantedMax) || 5;
+      const stars = clamp(Math.round(this.wanted ?? 0), 0, maxStars);
+      wantedEl.textContent = '★'.repeat(stars) + '☆'.repeat(maxStars - stars);
+    }
+
     const fuelEl = document.getElementById('hud-fuel');
     if (fuelEl) {
       const maxFuel = (typeof FUEL !== 'undefined' && FUEL.max) || 100;
       const curFuel = typeof this.fuel === 'number' ? this.fuel : maxFuel;
       fuelEl.textContent = `${Math.ceil((curFuel / maxFuel) * 100)}%`;
     }
-    const missionEl = document.getElementById('hud-mission');
-    if (missionEl && this.world) {
-      if (this.world.raceActive) {
-        const cpNum = Math.min((this.world.raceIndex || 0) + 1, (this.world.raceCheckpoints && this.world.raceCheckpoints.length) || 3);
-        const cpTotal = (this.world.raceCheckpoints && this.world.raceCheckpoints.length) || 3;
-        missionEl.textContent = `RACE CP ${cpNum}/${cpTotal} â€¢ ${Math.ceil(this.world.raceTime || 0)}s`;
+
+    const taxiEl = document.getElementById('hud-taxi');
+    if (taxiEl) {
+      const earned = Math.floor(this.taxiEarnings ?? 0);
+      if (!this.taxiMode) {
+        taxiEl.textContent = earned > 0 ? `TAXI: OFF ($${earned})` : 'TAXI: OFF';
+        taxiEl.classList.remove('active');
       } else {
-        missionEl.textContent = 'MISSION: VISIT OIL CO';
+        taxiEl.textContent = this.taxiPassenger
+          ? `TAXI: FARE • $${earned}`
+          : `TAXI: ON • $${earned}`;
+        taxiEl.classList.add('active');
       }
     }
-    const hpFill = document.getElementById('hud-health-fill');
-    if (hpFill) {
-      const hpPct = Math.max(0, Math.min(100, ((this.health ?? SURVIVAL.maxHealth) / SURVIVAL.maxHealth) * 100));
-      hpFill.style.width = `${hpPct}%`;
-    }
-    const wantedEl = document.getElementById('hud-wanted');
-    if (wantedEl) {
-      const stars = Math.max(0, Math.min(SURVIVAL.wantedMax, Math.round(this.wanted || 0)));
-      wantedEl.textContent = 'â˜…'.repeat(stars) + 'â˜†'.repeat(SURVIVAL.wantedMax - stars);
-    }
-    if (this.speedEl) {
-      const kmh = Math.round(Math.abs(this.car.speed || 0) * 3.6);
-      this.speedEl.textContent = String(kmh);
-    }
 
-    if (this.timeEl) {
-      const totalSec = Math.floor(this.elapsedTime);
-      const mins = String(Math.floor(totalSec / 60)).padStart(2, '0');
-      const secs = String(totalSec % 60).padStart(2, '0');
-      this.timeEl.textContent = `${mins}:${secs}`;
-    }
+    const missionEl = document.getElementById('hud-mission');
+    if (missionEl) {
+      const pPos = this.car && typeof this.car.getPosition === 'function'
+        ? this.car.getPosition()
+        : { x: 0, z: 0 };
 
-    if (this.coinsEl && this.displayedCoins !== this.coins) {
-      const prev = this.displayedCoins;
-      this.displayedCoins = this.coins;
-      this.effects.tweenCounter(this.coinsEl, prev, this.coins, 300);
-    } else if (this.coinsEl && !this.coinsEl.textContent) {
-      this.coinsEl.textContent = String(this.coins);
+      if (this.taxiMode) {
+        if (this.taxiPassenger && this.taxiTarget) {
+          const dist = Math.round(Math.hypot(pPos.x - this.taxiTarget.x, pPos.z - this.taxiTarget.z));
+          const origin = this.taxiPickupPos || pPos;
+          const tripDist = Math.hypot(this.taxiTarget.x - origin.x, this.taxiTarget.z - origin.z);
+          const base = (typeof TAXI !== 'undefined' && TAXI.fareBase) || 35;
+          const perM = (typeof TAXI !== 'undefined' && TAXI.farePerMeter) || 0.5;
+          const estFare = Math.round(base + tripDist * perM);
+          const etaSec = Math.max(1, Math.round(dist / 16));
+          missionEl.textContent = `DRIVE TO MARKER (${dist}m • ~${etaSec}s) - FARE $${estFare}`;
+        } else if (typeof this._pickupHint === 'function') {
+          missionEl.textContent = this._pickupHint(pPos);
+        } else {
+          missionEl.textContent = 'DRIVE NEAR A PEDESTRIAN TO PICK UP';
+        }
+      } else if (this.world && this.world.raceActive) {
+        const cpTotal = (this.world.raceCheckpoints && this.world.raceCheckpoints.length) || 3;
+        const cpNum = Math.min((this.world.raceIndex ?? 0) + 1, cpTotal);
+        const rem = Math.max(0, Math.ceil(this.world.raceTime ?? 0));
+        missionEl.textContent = `RACE CP ${cpNum}/${cpTotal} • ${rem}s LEFT`;
+      } else {
+        missionEl.textContent = 'EARN COINS VIA TAXI/RACE • OPEN SHOP FOR BIKE (400)';
+      }
     }
   }
 
