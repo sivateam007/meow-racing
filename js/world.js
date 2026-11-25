@@ -518,6 +518,54 @@ _buildWindowTextures() {
         minZ: pz - 3.6, maxZ: pz + 3.6
       });
     }
+
+    const edge = (WORLD_CFG.halfSpan || 300) + 90;
+    const outposts = [
+      { x: -edge, z: -edge * 0.45 },
+      { x: edge, z: edge * 0.4 },
+      { x: -edge * 0.5, z: edge },
+      { x: edge * 0.55, z: -edge }
+    ];
+    for (let i = 0; i < outposts.length; i++) {
+      const o = outposts[i];
+      const group = new THREE.Group();
+      group.position.set(o.x, 0, o.z);
+      const base = new THREE.Mesh(baseGeo, wallMat);
+      base.position.y = 1.6;
+      base.castShadow = true;
+      group.add(base);
+      const roof = new THREE.Mesh(roofGeo, roofMat);
+      roof.position.y = 3.5;
+      group.add(roof);
+
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 64;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#1c1917';
+      ctx.fillRect(0, 0, 256, 64);
+      ctx.fillStyle = '#fb923c';
+      ctx.font = '900 34px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('PIZZA', 128, 34);
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      const sign = new THREE.Mesh(
+        new THREE.PlaneGeometry(6.4, 1.6),
+        new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide })
+      );
+      sign.position.set(0, 2.4, 3.6);
+      group.add(sign);
+
+      const ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({
+        color: 0xf97316, transparent: true, opacity: 0.7, side: THREE.DoubleSide, depthWrite: false
+      }));
+      ring.position.set(0, 0.05, 5.5);
+      group.add(ring);
+      this.cityGroup.add(group);
+      this.pizzaShops.push({ x: o.x, z: o.z + 5.5, outside: true });
+    }
   }
 
   _clearRoadColliders() {

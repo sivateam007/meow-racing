@@ -877,6 +877,34 @@ _clearMissionMarker() {
     this.pizzaJob.marker = this._makePizzaMarker(x, z, phase === 'pickup' ? 0xfacc15 : 0x4ade80);
   }
 
+  _randomDeliveryPoint(center, forceOutside = false) {
+    const p = center || { x: 0, z: 0 };
+    const streets = this.world && Array.isArray(this.world.streetCoords) && this.world.streetCoords.length
+      ? this.world.streetCoords : [0];
+    const half = WORLD_CFG.halfSpan || 300;
+    if (forceOutside || Math.random() < 0.6) {
+      const d = 150 + Math.random() * 220;
+      const a = Math.random() * Math.PI * 2;
+      let x = p.x + Math.cos(a) * d;
+      let z = p.z + Math.sin(a) * d;
+      if (Math.abs(x) < half + 50 && Math.abs(z) < half + 50) {
+        const out = half + 70 + Math.random() * 90;
+        if (Math.abs(x) > Math.abs(z)) x = (x < 0 ? -1 : 1) * out;
+        else z = (z < 0 ? -1 : 1) * out;
+      }
+      return { x: Math.round(x), z: Math.round(z), outside: true };
+    }
+    let best = { x: streets[0] || 0, z: streets[0] || 0 };
+    let bestD = -1;
+    for (let i = 0; i < 24; i++) {
+      const sx = streets[Math.floor(Math.random() * streets.length)] || 0;
+      const sz = streets[Math.floor(Math.random() * streets.length)] || 0;
+      const dd = Math.hypot(sx - p.x, sz - p.z);
+      if (dd > bestD && dd < 220) { bestD = dd; best = { x: sx, z: sz }; }
+    }
+    return best;
+  }
+
   _startPizzaJob(def) {
     if (!this.world) return false;
     const shops = this.world.pizzaShops || [];
@@ -924,18 +952,9 @@ _clearMissionMarker() {
 
     if (j.phase === 'pickup') {
       j.phase = 'deliver';
-      const streets = this.world.streetCoords && this.world.streetCoords.length ? this.world.streetCoords : [0];
-      let cx = carPos.x + 80;
-      let cz = carPos.z + 80;
-      let bestD = -1;
-      for (let i = 0; i < 24; i++) {
-        const sx = streets[Math.floor(Math.random() * streets.length)] || 0;
-        const sz = streets[Math.floor(Math.random() * streets.length)] || 0;
-        const d = Math.hypot(sx - carPos.x, sz - carPos.z);
-        if (d > bestD && d < 220) { bestD = d; cx = sx; cz = sz; }
-      }
-      this._setPizzaTarget(cx, cz, 'deliver');
-      this._toast('PIZZA PICKED UP - DELIVER HOT', 1800);
+      const drop = this._randomDeliveryPoint(carPos);
+      this._setPizzaTarget(drop.x, drop.z, 'deliver');
+      this._toast(drop.outside ? 'OUT-OF-TOWN ORDER - DELIVER HOT' : 'PIZZA PICKED UP - DELIVER HOT', 1800);
     } else {
       const tip = Math.max(PIZZA.minTip || 3, Math.floor(j.timeLeft * (PIZZA.tipPerSecond || 0.8)));
       j.tips += tip;
@@ -1341,6 +1360,10 @@ _clearMissionMarker() {
     if (this.taxiMode) {
       if (this.taxiTarget) { obj = this.taxiTarget; color = '#4ade80'; label = 'D'; }
       else if (this.taxiPickupPoint) { obj = this.taxiPickupPoint; color = '#facc15'; label = 'P'; }
+    } else if (this.pizzaJob && this.pizzaJob.active && this.pizzaJob.target) {
+      obj = this.pizzaJob.target;
+      color = this.pizzaJob.phase === 'pickup' ? '#f97316' : '#4ade80';
+      label = this.pizzaJob.phase === 'pickup' ? 'P' : 'D';
     }
 
     if (obj) {
