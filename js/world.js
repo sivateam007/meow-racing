@@ -296,7 +296,6 @@ export class World {
     this._buildSkyline();
     this._buildOilDistrict();
     this._buildTerrain();
-    this._buildBridges();
     this._buildGreenDistricts();
     this._buildDesertAirport();
     this._buildFuelStation();
@@ -965,9 +964,9 @@ export class World {
   _spawnPolice(wantedLevel = 0, playerPos = { x: 0, z: 0 }) {
     if (!Array.isArray(this.policePool)) this.policePool = [];
     const targetCount = clamp(
-      Math.floor(wantedLevel),
+      Math.floor(wantedLevel) - 1,
       0,
-      (SURVIVAL && SURVIVAL.wantedMax) || 5
+      3
     );
     while (this.policePool.length < targetCount) {
       const idx = this.policePool.length;
@@ -1006,9 +1005,9 @@ export class World {
       let diff = desiredHeading - cop.heading;
       while (diff > Math.PI) diff -= Math.PI * 2;
       while (diff < -Math.PI) diff += Math.PI * 2;
-      cop.heading += diff * Math.min(1, safeDt * 4.5);
-      const targetSpeed = dist > 12 ? 32 + wantedLevel * 2.2 : 16;
-      cop.speed = lerp(cop.speed, targetSpeed, safeDt * 4);
+      cop.heading += diff * Math.min(1, safeDt * 2.2);
+      const targetSpeed = dist > 60 ? 12 : dist > 12 ? 18 + wantedLevel : 8;
+      cop.speed = lerp(cop.speed, targetSpeed, safeDt * 2);
       pos.x = clamp(pos.x - Math.sin(cop.heading) * cop.speed * safeDt, -spanLimit, spanLimit);
       pos.z = clamp(pos.z - Math.cos(cop.heading) * cop.speed * safeDt, -spanLimit, spanLimit);
       cop.mesh.rotation.y = cop.heading;

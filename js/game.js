@@ -4,6 +4,7 @@ import { WORLD_CFG, CAR_CFG, COLORS, INPUT, SURVIVAL, FUEL, TRAIN, TAXI, SHOP, c
 import Car from './car.js';
 import World from './world.js';
 import Effects from './effects.js';
+import { CityStorage } from './cityStorage.js';
 
 export class Game {
   constructor() {
@@ -20,7 +21,14 @@ export class Game {
     this.state = 'menu';
     this.elapsedTime = 0;
     this.displayedCoins = 0;
-    this.coins = 0;
+    this.profile = CityStorage.get();
+    this.coins = this.profile.coins || 0;
+    this.level = this.profile.level || 1;
+    this.ownedVehicles = (this.profile.ownedVehicles || ['sedan']).slice();
+    this.currentVehicle = this.profile.currentVehicle || 'sedan';
+    this.controlLayout = this.profile.layout || 'compact';
+    this._lastCarPos = null;
+    this._distanceAccum = 0;
     this.collisionCooldown = 0;
 
     this.keys = new Set();
@@ -38,6 +46,7 @@ export class Game {
     this.effects = new Effects(this.scene, this.camera, this.sunLight);
 
     this._bindEvents();
+    this._applyLayoutPreset(this.controlLayout || 'compact');
     this._updateHud();
     this._updateMinimap();
 
@@ -208,10 +217,8 @@ export class Game {
         if (!this.ownedVehicles.includes(vType)) {
           this.ownedVehicles.push(vType);
           unlocked = true;
-          try {
-            localStorage.setItem('meow_open_city_vehicles', JSON.stringify(this.ownedVehicles));
-          } catch (_) {}
         }
+        CityStorage.unlockVehicle(vType);
         this.currentVehicle = vType;
         if (this.car && typeof this.car.setVehicleType === 'function') {
           this.car.setVehicleType(vType);
@@ -306,9 +313,7 @@ _applyLayoutPreset(preset = 'compact') {
     if (document.body) {
       document.body.dataset.layout = chosen;
     }
-    try {
-      localStorage.setItem('meow_open_city_layout', chosen);
-    } catch (_) {}
+    CityStorage.setLayout(chosen);
   }
 
   _openSettings() {
@@ -341,13 +346,16 @@ _applyLayoutPreset(preset = 'compact') {
     this.taxiMode = false;
     this.taxiPassenger = null;
     this.taxiEarnings = 0;
-    this.currentVehicle = this.currentVehicle || 'sedan';
-    try {
-      const saved = JSON.parse(localStorage.getItem('meow_open_city_vehicles') || '["sedan"]');
-      this.ownedVehicles = Array.isArray(saved) && saved.length > 0 ? saved : ['sedan'];
-    } catch (_) {
-      this.ownedVehicles = ['sedan'];
+    const profile = CityStorage.get();
+    this.coins = profile.coins || 0;
+    this.level = profile.level || 1;
+    this.ownedVehicles = Array.isArray(profile.ownedVehicles) && profile.ownedVehicles.length
+      ? profile.ownedVehicles.slice() : ['sedan'];
+    this.currentVehicle = this.ownedVehicles.includes(profile.currentVehicle) ? profile.currentVehicle : 'sedan';
+    if (this.car && typeof this.car.setVehicleType === 'function') {
+      this.car.setVehicleType(this.currentVehicle);
     }
+    this._lastCarPos = null;
     if (typeof FUEL !== 'undefined') this.fuel = FUEL.startAmount ?? FUEL.max ?? 100;
     if (this.world && typeof this.world._startStreetRace === 'function') {
       this.world._startStreetRace(this.car.getPosition());
@@ -627,8 +635,13 @@ _toast(msg, ms = 1800) {
     this.taxiPickupPoint = null;
     if (this.world) this.world.taxiTarget = null;
     this._clearFareMarker();
-    if (farePaid > 0 && typeof this._toast === 'function') {
-      this._toast(`FARE PAID $${Math.round(farePaid)}`, 2000);
+    if (farePaid > 0) {
+      const p = CityStorage.addFare(farePaid);
+      this.coins = p.coins;
+      this.level = p.level;
+      if (typeof this._toast === 'function') {
+        this._toast(`FARE PAID $${Math.round(farePaid)} • LV ${p.level}`, 2000);
+      }
     }
     if (this.taxiMode) this._startFare();
     this._updateHud();
@@ -662,6 +675,9 @@ _toast(msg, ms = 1800) {
     if (coinsEl) {
       coinsEl.textContent = String(Math.floor(this.coins ?? 0));
     }
+
+    const levelEl = document.getElementById('hud-level');
+    if (levelEl) levelEl.textContent = `LV ${Math.max(1, Math.floor(this.level || 1))}`;
 
     const timeEl = document.getElementById('hud-time');
     if (timeEl) {
@@ -755,31 +771,39 @@ _toast(msg, ms = 1800) {
     const ctx = this.minimapCtx;
     const w = this.minimapCanvas.width;
     const h = this.minimapCanvas.height;
-    const span = WORLD_CFG.gridSpan || 374;
-    const toMapX = (wx) => ((wx + span * 0.5) / span) * w;
-    const toMapY = (wz) => ((wz + span * 0.5) / span) * h;
-    const roadPx = Math.max(2, (WORLD_CFG.roadWidth / span) * w);
+    const cx = w * 0.5;
+    const cy = h * 0.5;
+    const range = 170;
+    const carPos = this.car.getPosition();
     const t = this.world.time || 0;
+    const toX = (wx) => cx + ((wx - carPos.x) / (range * 2)) * w;
+    const toY = (wz) => cy + ((wz - carPos.z) / (range * 2)) * h;
 
     ctx.clearRect(0, 0, w, h);
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, Math.min(cx, cy) - 1, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.fillStyle = 'rgba(10, 16, 32, 0.94)';
     ctx.fillRect(0, 0, w, h);
 
-    ctx.fillStyle = 'rgba(148, 163, 184, 0.42)';
     const streets = this.world.streetCoords || [];
-    for (let i = 0; i < streets.length; i++) {
-      const sx = toMapX(streets[i]) - roadPx * 0.5;
-      const sy = toMapY(streets[i]) - roadPx * 0.5;
-      ctx.fillRect(sx, 0, roadPx, h);
-      ctx.fillRect(0, sy, w, roadPx);
+    const roadPx = Math.max(2, (WORLD_CFG.roadWidth / (range * 2)) * w);
+    ctx.fillStyle = 'rgba(148, 163, 184, 0.42)';
+    for (const s of streets) {
+      const sx = toX(s) - roadPx * 0.5;
+      const sy = toY(s) - roadPx * 0.5;
+      if (sx < w && sx + roadPx > 0) ctx.fillRect(sx, 0, roadPx, h);
+      if (sy < h && sy + roadPx > 0) ctx.fillRect(0, sy, w, roadPx);
     }
 
     const stations = (this.world.fuelStations && this.world.fuelStations.length)
       ? this.world.fuelStations
       : (this.world.fuelStation ? [this.world.fuelStation] : []);
     for (const st of stations) {
-      const fx = toMapX(st.x);
-      const fy = toMapY(st.z);
+      const fx = toX(st.x);
+      const fy = toY(st.z);
+      if (fx < -6 || fx > w + 6 || fy < -6 || fy > h + 6) continue;
       ctx.fillStyle = '#4ade80';
       ctx.fillRect(fx - 3, fy - 3, 6, 6);
       ctx.strokeStyle = 'rgba(74, 222, 128, 0.7)';
@@ -788,18 +812,6 @@ _toast(msg, ms = 1800) {
       ctx.font = 'bold 8px sans-serif';
       ctx.fillText('F', fx - 2, fy - 7);
     }
-
-    if (this.world.trafficPool) {
-      ctx.fillStyle = '#facc15';
-      for (let i = 0; i < this.world.trafficPool.length; i++) {
-        const tp = this.world.trafficPool[i].group.position;
-        ctx.fillRect(toMapX(tp.x) - 1.5, toMapY(tp.z) - 1.5, 3, 3);
-      }
-    }
-
-    const carPos = this.car.getPosition();
-    const cx = toMapX(carPos.x);
-    const cy = toMapY(carPos.z);
 
     let obj = null;
     let color = '#facc15';
@@ -813,8 +825,8 @@ _toast(msg, ms = 1800) {
     }
 
     if (obj) {
-      const ox = toMapX(obj.x || 0);
-      const oy = toMapY(obj.z || 0);
+      const ox = toX(obj.x || 0);
+      const oy = toY(obj.z || 0);
       ctx.save();
       ctx.strokeStyle = color;
       ctx.lineWidth = 2.5;
@@ -828,7 +840,7 @@ _toast(msg, ms = 1800) {
       ctx.stroke();
       ctx.restore();
 
-      const pulse = 4 + Math.sin(t * 5) * 2;
+      const pulse = 5 + Math.sin(t * 5) * 2;
       ctx.strokeStyle = color;
       ctx.lineWidth = 2;
       ctx.globalAlpha = 0.85;
@@ -844,19 +856,38 @@ _toast(msg, ms = 1800) {
       ctx.fillText(label, ox + 6, oy - 5);
     }
 
+    if (this.world.trafficPool) {
+      ctx.fillStyle = '#facc15';
+      for (const agent of this.world.trafficPool) {
+        const p = agent && agent.group && agent.group.position;
+        if (!p) continue;
+        ctx.fillRect(toX(p.x) - 1.5, toY(p.z) - 1.5, 3, 3);
+      }
+    }
+
     ctx.save();
     ctx.translate(cx, cy);
     const heading = typeof this.car.getHeading === 'function' ? this.car.getHeading() : 0;
     ctx.rotate(-heading);
     ctx.fillStyle = '#38bdf8';
     ctx.beginPath();
-    ctx.moveTo(0, -6);
-    ctx.lineTo(4.5, 5);
-    ctx.lineTo(0, 2.5);
-    ctx.lineTo(-4.5, 5);
+    ctx.moveTo(0, -7);
+    ctx.lineTo(5, 6);
+    ctx.lineTo(0, 3);
+    ctx.lineTo(-5, 6);
     ctx.closePath();
     ctx.fill();
     ctx.restore();
+    ctx.restore();
+
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.75)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, Math.min(cx, cy) - 1, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = '#7dd3fc';
+    ctx.font = 'bold 9px sans-serif';
+    ctx.fillText('N', cx - 3, 12);
   }
 
   _loop(now) {
@@ -880,6 +911,19 @@ _toast(msg, ms = 1800) {
 
     const carPos = this.car.getPosition();
     this.world.update(dt, carPos, this.wanted || 0);
+
+    if (this.state === 'play') {
+      if (this._lastCarPos) {
+        const moved = Math.hypot(carPos.x - this._lastCarPos.x, carPos.z - this._lastCarPos.z);
+        if (moved > 0.01 && moved < 6) this._distanceAccum += moved;
+      }
+      this._lastCarPos = { x: carPos.x, z: carPos.z };
+      if (this._distanceAccum >= 60) {
+        const p = CityStorage.addDistance(this._distanceAccum);
+        this.level = p.level;
+        this._distanceAccum = 0;
+      }
+    }
 
     if (this.state === 'play' && this.taxiMode && typeof TAXI !== 'undefined') {
       const pPos = this.car.getPosition();
@@ -932,7 +976,6 @@ _toast(msg, ms = 1800) {
             this.taxiTarget.z - (this.taxiPickupPos ? this.taxiPickupPos.z : pPos.z)
           );
           const fare = Math.round((TAXI.fareBase || 35) + tripDist * (TAXI.farePerMeter || 0.5));
-          this.coins = (this.coins || 0) + fare;
           this.taxiEarnings = (this.taxiEarnings || 0) + fare;
           if (typeof this._endFare === 'function') this._endFare(fare);
           else {
