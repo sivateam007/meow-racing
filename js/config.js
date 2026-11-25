@@ -390,8 +390,25 @@ export const MISSION_LIST = [
   { id: 'm9_cool_head', name: 'Unscathed Run', type: 'survive', minLevel: 7, reward: 550, xp: 270, timeLimit: 70, description: 'Survive 70s with zero crashes.' },
   { id: 'm10_apex_circuit', name: 'Apex Sprint', type: 'sprint', minLevel: 8, reward: 650, xp: 340, checkpointCount: 3, timeLimit: 75, description: 'Clear 3 high-speed checkpoints.' },
   { id: 'm11_master_cabby', name: 'Meow Cab Pro', type: 'taxi', minLevel: 9, reward: 780, xp: 420, fareCount: 5, description: 'Complete 5 taxi fares.' },
-  { id: 'm12_city_legend', name: 'Open City Legend', type: 'cruise', minLevel: 10, reward: 900, xp: 500, target: 2000, description: 'Drive 2000m like a city legend.' }
+  { id: 'm12_city_legend', name: 'Open City Legend', type: 'cruise', minLevel: 10, reward: 900, xp: 500, target: 2000, description: 'Drive 2000m like a city legend.' },
+  { id: 'm13_car_race', name: 'Circuit Clash', type: 'race', raceMode: 'car', minLevel: 2, reward: 600, xp: 250, description: 'Beat 5 rivals in a 2-lap car circuit.' },
+  { id: 'm14_bike_race', name: 'Two-Wheel Thunder', type: 'race', raceMode: 'bike', minLevel: 4, reward: 700, xp: 300, description: 'Beat 5 rivals in a 2-lap bike circuit.' }
 ];
+
+export const RACE_MODES = {
+  car: {
+    label: 'CAR RACE', aiCount: 5, laps: 2, checkpoints: 6, timeLimit: 150,
+    reward: 600, xp: 250,
+    allowed: ['sedan', 'coupe', 'muscle', 'supercar', 'hatchback', 'wagon', 'minivan', 'roadster', 'rally_car', 'drift_car', 'limousine', 'grand_tourer', 'suv_luxury', 'pickup', 'tow_truck', 'box_truck', 'ambulance', 'fire_truck', 'swat_van', 'cement_mixer', 'dump_truck', 'bus', 'taxi', 'police'],
+    colors: [0xef4444, 0x3b82f6, 0xa855f7, 0x22c55e, 0xf97316]
+  },
+  bike: {
+    label: 'BIKE RACE', aiCount: 5, laps: 2, checkpoints: 6, timeLimit: 140,
+    reward: 700, xp: 300,
+    allowed: ['bike', 'cruiser_bike', 'dirt_bike', 'sport_bike'],
+    colors: [0xef4444, 0x22d3ee, 0xa855f7, 0xfacc15, 0x34d399]
+  }
+};
 
 export const LEVEL_TITLES = [
   'Rookie Wheel',
