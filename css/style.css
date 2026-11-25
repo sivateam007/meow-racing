@@ -1,4 +1,4 @@
-*,
+﻿*,
 *::before,
 *::after {
   box-sizing: border-box;
@@ -825,22 +825,26 @@ body[data-layout="right"] .touch-group-right {
   }
 }
 #toast:empty { display: none; }
-/* === ACTION BUTTONS: bottom-center, clear of minimap and drive controls === */
-.touch-group-actions {
+/* === ACTION BUTTONS: TAXI/SHOP left under coins, PAUSE right under speedometer === */
+.touch-group-actions { display: contents; }
+#touch-taxi,
+#touch-shop,
+#touch-pause {
   position: fixed;
-  bottom: 96px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  pointer-events: none;
   z-index: 30;
+  pointer-events: auto;
 }
-.touch-group-actions .touch-btn { pointer-events: auto; }
+#touch-taxi  { left: 10px;  top: 150px; }
+#touch-shop  { left: 76px;  top: 150px; }
+#touch-pause { right: 10px; top: 160px; }
+
 @media (orientation: landscape) and (max-height: 520px) {
-  .touch-group-actions { bottom: 78px; gap: 6px; }
-  .touch-group-actions .touch-btn {
+  #touch-taxi,
+  #touch-shop,
+  #touch-pause {
     width: 50px; height: 50px; min-width: 48px; min-height: 48px; font-size: 9px;
   }
+  #touch-taxi  { left: 10px;  top: 130px; }
+  #touch-shop  { left: 66px;  top: 130px; }
+  #touch-pause { right: 10px; top: 92px; }
 }
