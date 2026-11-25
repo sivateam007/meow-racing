@@ -19,6 +19,8 @@ const DEFAULT_PROFILE = {
   totalDistance: 0,
   faresEarned: 0,
   faresCompleted: 0,
+  deliveriesCompleted: 0,
+  bestPizzaRun: 0,
   racesWon: 0,
   bestTimeSec: 0,
   lastPlayed: 0
@@ -59,6 +61,8 @@ function sanitize(raw) {
   p.totalDistance = num(raw.totalDistance);
   p.faresEarned = Math.floor(num(raw.faresEarned));
   p.faresCompleted = Math.floor(num(raw.faresCompleted));
+  p.deliveriesCompleted = Math.floor(num(raw.deliveriesCompleted));
+  p.bestPizzaRun = Math.floor(num(raw.bestPizzaRun));
   p.racesWon = Math.floor(num(raw.racesWon));
   p.bestTimeSec = num(raw.bestTimeSec);
   p.lastPlayed = num(raw.lastPlayed);

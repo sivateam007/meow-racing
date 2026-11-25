@@ -1,6 +1,6 @@
 ﻿import * as THREE from 'three';
 import anime from 'animejs';
-import { WORLD_CFG, CAR_CFG, SPEED_LEVELS, COLORS, INPUT, SURVIVAL, FUEL, TRAIN, TAXI, SHOP, VEHICLE_TYPES, MISSION_LIST, LEVEL_TITLES, clamp } from './config.js';
+import { WORLD_CFG, CAR_CFG, SPEED_LEVELS, COLORS, INPUT, SURVIVAL, FUEL, PIZZA, TRAIN, TAXI, SHOP, VEHICLE_TYPES, MISSION_LIST, LEVEL_TITLES, clamp } from './config.js';
 import Car from './car.js';
 import World from './world.js';
 import Effects from './effects.js';
@@ -413,6 +413,8 @@ export class Game {
     this.level = profile.level || 1;
     this.faresCompleted = profile.faresCompleted || 0;
     this.activeMission = null;
+    this._clearPizzaMarker();
+    this.pizzaJob = null;
     this.ownedVehicles = Array.isArray(profile.ownedVehicles) && profile.ownedVehicles.length
       ? profile.ownedVehicles.slice() : ['sedan'];
     this.currentVehicle = this.ownedVehicles.includes(profile.currentVehicle) ? profile.currentVehicle : 'sedan';
@@ -813,6 +815,145 @@ _clearMissionMarker() {
     panel.classList.remove('hidden');
   }
 
+  _clearPizzaMarker() {
+    if (this.pizzaJob && this.pizzaJob.marker) {
+      if (this.pizzaJob.marker.parent) this.pizzaJob.marker.parent.remove(this.pizzaJob.marker);
+      this.pizzaJob.marker = null;
+    }
+  }
+
+  _makePizzaMarker(x, z, colorHex) {
+    try {
+      const g = new THREE.Group();
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(3.2, 4.6, 24),
+        new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: 0.75, side: THREE.DoubleSide, depthWrite: false })
+      );
+      ring.rotation.x = -Math.PI * 0.5;
+      ring.position.y = 0.08;
+      g.add(ring);
+      const beam = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.7, 1.5, 8, 10, 1, true),
+        new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: 0.28, depthWrite: false })
+      );
+      beam.position.y = 4;
+      g.add(beam);
+      const box = new THREE.Mesh(
+        new THREE.BoxGeometry(1.6, 1.2, 1.6),
+        new THREE.MeshStandardMaterial({ color: 0xf97316, emissive: 0x7c2d12, emissiveIntensity: 0.5 })
+      );
+      box.position.y = 2.2;
+      g.add(box);
+      g.position.set(x, 0, z);
+      if (this.world && this.world.scene) this.world.scene.add(g);
+      return g;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  _setPizzaTarget(x, z, phase) {
+    this._clearPizzaMarker();
+    this.pizzaJob.target = { x, z };
+    this.pizzaJob.marker = this._makePizzaMarker(x, z, phase === 'pickup' ? 0xfacc15 : 0x4ade80);
+  }
+
+  _startPizzaJob(def) {
+    if (!this.world) return false;
+    const shops = this.world.pizzaShops || [];
+    if (!shops.length) return false;
+    const p = this.car.getPosition();
+    let shop = shops[0];
+    let best = Infinity;
+    for (const s of shops) {
+      const d = Math.hypot(s.x - p.x, s.z - p.z);
+      if (d < best) { best = d; shop = s; }
+    }
+    this.pizzaJob = {
+      def, done: 0, orders: def.orders || 1,
+      timeLeft: def.orderTime || PIZZA.orderTime || 40,
+      tips: 0, phase: 'pickup', target: null, marker: null,
+      active: true, finished: false, success: false
+    };
+    this._setPizzaTarget(shop.x, shop.z, 'pickup');
+    this._toast('PIZZA JOB - PICK UP AT RESTAURANT', 2200);
+    return true;
+  }
+
+  _pizzaText() {
+    const j = this.pizzaJob;
+    if (!j || !j.active) return '';
+    return `${j.phase === 'pickup' ? 'PICKUP' : 'DELIVER'} ${j.done}/${j.orders} • ${Math.max(0, Math.ceil(j.timeLeft))}s • TIP $${j.tips}`;
+  }
+
+  _updatePizzaJob(dt, carPos) {
+    const j = this.pizzaJob;
+    if (!j || !j.active || j.finished) return;
+    const safeDt = Math.min(dt, 0.05);
+    j.timeLeft -= safeDt;
+    if (j.timeLeft <= 0) { this._endPizzaJob(false); return; }
+    if (j.marker) j.marker.rotation.y += safeDt * 1.5;
+
+    const t = j.target;
+    if (!t) return;
+    const radius = j.phase === 'pickup' ? (PIZZA.pickupRadius || 12) : (PIZZA.deliverRadius || 12);
+    if (Math.hypot(carPos.x - t.x, carPos.z - t.z) > radius) return;
+
+    if (j.phase === 'pickup') {
+      j.phase = 'deliver';
+      const streets = this.world.streetCoords && this.world.streetCoords.length ? this.world.streetCoords : [0];
+      let cx = carPos.x + 80;
+      let cz = carPos.z + 80;
+      let bestD = -1;
+      for (let i = 0; i < 24; i++) {
+        const sx = streets[Math.floor(Math.random() * streets.length)] || 0;
+        const sz = streets[Math.floor(Math.random() * streets.length)] || 0;
+        const d = Math.hypot(sx - carPos.x, sz - carPos.z);
+        if (d > bestD && d < 220) { bestD = d; cx = sx; cz = sz; }
+      }
+      this._setPizzaTarget(cx, cz, 'deliver');
+      this._toast('PIZZA PICKED UP - DELIVER HOT', 1800);
+    } else {
+      const tip = Math.max(PIZZA.minTip || 3, Math.floor(j.timeLeft * (PIZZA.tipPerSecond || 0.8)));
+      j.tips += tip;
+      j.done += 1;
+      if (j.done >= j.orders) { this._endPizzaJob(true); return; }
+      j.phase = 'pickup';
+      j.timeLeft = j.def.orderTime || PIZZA.orderTime || 40;
+      const shops = this.world.pizzaShops || [];
+      let shop = shops[0];
+      let best = Infinity;
+      for (const s of shops) {
+        const d = Math.hypot(s.x - carPos.x, s.z - carPos.z);
+        if (d < best) { best = d; shop = s; }
+      }
+      if (shop) this._setPizzaTarget(shop.x, shop.z, 'pickup');
+      this._toast(`ORDER DELIVERED +$${tip} TIP - NEXT PICKUP`, 1800);
+    }
+  }
+
+  _endPizzaJob(success) {
+    const j = this.pizzaJob;
+    if (!j || !j.active) return;
+    j.active = false;
+    j.finished = true;
+    j.success = success;
+    this._clearPizzaMarker();
+    if (success) {
+      const prof = CityStorage.get();
+      CityStorage.save({
+        deliveriesCompleted: (prof.deliveriesCompleted || 0) + j.done,
+        bestPizzaRun: prof.bestPizzaRun ? Math.max(prof.bestPizzaRun, j.tips) : j.tips
+      });
+      CityStorage.addCoins(j.tips);
+      if (this.activeMission) this.activeMission.progress = this.activeMission.target;
+      this._toast(`ALL PIZZAS DELIVERED +$${j.tips} TIPS`, 2400);
+    } else {
+      if (this.activeMission) this.activeMission.failed = true;
+      this._toast('PIZZA COLD - JOB FAILED', 2000);
+    }
+  }
+
   _startMission(id) {
     this._clearMissionMarker();
     const missions = typeof MISSION_LIST !== 'undefined' ? MISSION_LIST : [];
@@ -822,6 +963,13 @@ _clearMissionMarker() {
     const prof = typeof CityStorage !== 'undefined' && CityStorage.get ? CityStorage.get() : (this.profile || {});
     const isReplay = Array.isArray(prof.missionsCompleted) && prof.missionsCompleted.includes(def.id);
     const pPos = this.car && typeof this.car.getPosition === 'function' ? this.car.getPosition() : { x: 0, z: 0 };
+
+    if (def.type === 'pizza') {
+      if (!this._startPizzaJob(def)) return;
+      this.activeMission = { id: def.id, def, isReplay, progress: 0, target: def.orders || 1, pizza: true };
+      this._updateHud();
+      return;
+    }
 
     const totalCheckpoints = def.type === 'sprint' ? (def.checkpointCount || 3) : 1;
     const pt = this._pickMissionStreetPoint(pPos, 65);
@@ -867,6 +1015,16 @@ _clearMissionMarker() {
     const def = mState.def;
     const px = carPos.x || 0;
     const pz = carPos.z || 0;
+
+    if (def.type === 'pizza') {
+      if (mState.failed) {
+        this.activeMission = null;
+      } else if (this.pizzaJob && this.pizzaJob.finished && this.pizzaJob.success) {
+        mState.progress = mState.target;
+        this._completeMission();
+      }
+      return;
+    }
 
     if (typeof mState.timeLeft === 'number') {
       mState.timeLeft = Math.max(0, mState.timeLeft - safeDt);
@@ -968,6 +1126,9 @@ _clearMissionMarker() {
     const tgt = Math.floor(mState.target || 1);
     const timerPart = typeof mState.timeLeft === 'number' ? ` • ${Math.ceil(mState.timeLeft)}s` : '';
 
+    if (def.type === 'pizza') {
+      return `PIZZA: ${this._pizzaText() || 'GET READY'}`;
+    }
     if (def.type === 'cruise') {
       return `JOB: ${def.name.toUpperCase()} (${cur}/${tgt}m)${timerPart}`;
     }
@@ -991,6 +1152,17 @@ _clearMissionMarker() {
       const idx = Math.min(SPEED_LEVELS.length - 1, Math.max(0, this.speedLevel || 0));
       speedBtn.textContent = `SPD ${idx + 1}`;
       speedBtn.setAttribute('aria-label', `Speed level ${idx + 1}: ${SPEED_LEVELS[idx].label}`);
+    }
+
+    const pizzaHud = document.getElementById('pizza-hud');
+    if (pizzaHud) {
+      const txt = typeof this._pizzaText === 'function' ? this._pizzaText() : '';
+      if (txt) {
+        pizzaHud.textContent = txt;
+        pizzaHud.classList.remove('hidden');
+      } else {
+        pizzaHud.classList.add('hidden');
+      }
     }
 
     const timeEl = document.getElementById('hud-time');
@@ -1240,6 +1412,9 @@ _clearMissionMarker() {
       }
       if (typeof this._updateMissions === 'function') {
         this._updateMissions(dt, carPos);
+      }
+      if (this.pizzaJob && this.pizzaJob.active && typeof this._updatePizzaJob === 'function') {
+        this._updatePizzaJob(dt, carPos);
       }
     }
 

@@ -320,6 +320,16 @@ export const TERRAIN = {
 
 export const PED_STYLES = ['casual', 'business', 'runner', 'skater', 'tourist'];
 
+export const PIZZA = {
+  shopCount: 3,
+  pickupRadius: 12,
+  deliverRadius: 12,
+  orderTime: 40,
+  tipPerSecond: 0.8,
+  minTip: 3,
+  shopPalette: [0xef4444, 0xf97316, 0xeab308]
+};
+
 // Add inside VEHICLE_TYPES:
 // coupe: { label: 'Coupe', w: 1.96, h: 1.12, l: 4.15, speedMin: 20, speedMax: 29, spawnWeight: 14, colors: [0xf43f5e, 0x38bdf8, 0xfacc15, 0xa855f7] },
 // muscle: { label: 'Muscle', w: 2.08, h: 1.18, l: 4.55, speedMin: 22, speedMax: 32, spawnWeight: 12, colors: [0xf97316, 0x1e293b, 0xdc2626, 0xfbbf24] },
@@ -384,6 +394,9 @@ export const MISSION_LIST = [
   { id: 'm10_apex_circuit', name: 'Apex Sprint', type: 'sprint', minLevel: 8, reward: 650, xp: 340, checkpointCount: 3, timeLimit: 75, description: 'Clear 3 high-speed checkpoints.' },
   { id: 'm11_master_cabby', name: 'Meow Cab Pro', type: 'taxi', minLevel: 9, reward: 780, xp: 420, fareCount: 5, description: 'Complete 5 taxi fares.' },
   { id: 'm12_city_legend', name: 'Open City Legend', type: 'cruise', minLevel: 10, reward: 900, xp: 500, target: 2000, description: 'Drive 2000m like a city legend.' },
+  { id: 'pz1_first_slice', name: 'First Slice', type: 'pizza', minLevel: 1, reward: 120, xp: 60, orders: 1, orderTime: 50, description: 'Pick up 1 pizza and deliver it hot.' },
+  { id: 'pz2_rush_hour', name: 'Rush Hour Run', type: 'pizza', minLevel: 3, reward: 320, xp: 150, orders: 3, orderTime: 42, description: 'Deliver 3 pizzas in one run.' },
+  { id: 'pz3_pizza_legend', name: 'Pizza Legend', type: 'pizza', minLevel: 6, reward: 650, xp: 320, orders: 5, orderTime: 36, description: 'Deliver 5 pizzas before the city goes cold.' }
 ];
 
 ;

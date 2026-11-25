@@ -229,6 +229,32 @@ replayable at reduced reward; coins/XP/missionsCompleted survive reload; zero co
 
 ---
 
+## Step 10 — Pizza delivery jobs
+
+> LABEL PATCH 1 — config.js — ADD-ONLY `PIZZA` config (shopCount 3, pickup/deliver radius 12,
+> orderTime 40, tipPerSecond 0.8, minTip 3) and 3 `type:'pizza'` missions in `MISSION_LIST`
+> (orders 1/3/5, minLevel 1/3/6).
+>
+> LABEL PATCH 2 — world.js — ADD-ONLY `_buildPizzaShops()` with 3 storefronts on **block interiors**
+> (never roads), neon PIZZA sign, glowing ring, `this.pizzaShops[]`, colliders passed through
+> `_clearRoadColliders()`. Call at end of `buildCity()`.
+>
+> LABEL PATCH 3 — game.js — ADD-ONLY `_clearPizzaMarker`, `_makePizzaMarker`, `_setPizzaTarget`,
+> `_startPizzaJob`, `_pizzaText`, `_updatePizzaJob`, `_endPizzaJob`. Loop: pickup at restaurant →
+> timed delivery → tip from remaining time → next order chains to nearest shop.
+>
+> LABEL PATCH 4 — game.js — branch `type:'pizza'` in `_startMission`, `_updateMissions` and
+> `_missionText`; call `_updatePizzaJob()` from `_loop()`.
+>
+> LABEL PATCH 5 — index.html / css — ADD-ONLY `#pizza-hud` chip (`PICKUP 1/3 • 24s • TIP $18`).
+>
+> LABEL PATCH 6 — cityStorage.js — ADD-ONLY `deliveriesCompleted` and `bestPizzaRun`.
+
+**Acceptance:** 3 pizza jobs in the panel, shops never on roads, tips decay with time,
+multi-order chains work, rewards paid once, progress persists, zero console errors.
+
+---
+
 ## Final validation checklist (run after every step)
 
 ```powershell
