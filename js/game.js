@@ -270,6 +270,10 @@ export class Game {
       deliveryBtn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
+        if (this.pizzaJob && this.pizzaJob.active && !this.pizzaJob.finished) {
+          this._toast('DELIVERY ALREADY ACTIVE - FINISH IT FIRST', 2000);
+          return;
+        }
         const missions = typeof MISSION_LIST !== 'undefined' ? MISSION_LIST : [];
         const level = Math.max(1, Math.floor(this.level || 1));
         const jobs = missions.filter((m) => m.type === 'pizza' && (m.minLevel || 1) <= level);

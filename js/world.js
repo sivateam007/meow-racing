@@ -263,7 +263,15 @@ _buildWindowTextures() {
     const swH = WORLD_CFG.sidewalkHeight;
     const innerSpan = Math.max(8, bSpan - swW * 2);
 
-    for (const block of this.blockCenters) {
+    const totalBlocks = this.blockCenters.length;
+    this.pizzaBlockKeys = new Set([
+      Math.floor(totalBlocks * 0.16),
+      Math.floor(totalBlocks * 0.46),
+      Math.floor(totalBlocks * 0.76)
+    ]);
+
+    for (let blockIndex = 0; blockIndex < this.blockCenters.length; blockIndex++) {
+      const block = this.blockCenters[blockIndex];
       const sidewalkMesh = new THREE.Mesh(
         new THREE.BoxGeometry(bSpan, swH, bSpan),
         sidewalkMat
@@ -286,6 +294,8 @@ _buildWindowTextures() {
         bulb.position.set(block.x + lx, swH + 6.2, block.z + lz);
         this.cityGroup.add(bulb);
       }
+
+      if (this.pizzaBlockKeys.has(blockIndex)) continue;
 
       const subMode = (block.bx + block.bz) % 3;
       const footprints =
@@ -457,28 +467,65 @@ _buildWindowTextures() {
 
     const wallMat = new THREE.MeshStandardMaterial({ color: 0xfef3c7, roughness: 0.7 });
     const roofMat = new THREE.MeshStandardMaterial({ color: 0xb91c1c, roughness: 0.75 });
-    const baseGeo = new THREE.BoxGeometry(9, 3.2, 7);
-    const roofGeo = new THREE.BoxGeometry(10, 0.6, 8);
+    const trimMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.55 });
+    const yardMat = new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.92 });
+    const winMat = new THREE.MeshStandardMaterial({ color: 0xfde68a, emissive: 0xf59e0b, emissiveIntensity: 0.6 });
+    const bodyGeo = new THREE.BoxGeometry(16, 5, 13);
+    const gableGeo = new THREE.BoxGeometry(9.2, 0.5, 14);
+    const porchGeo = new THREE.BoxGeometry(16, 0.4, 3.2);
+    const colGeo = new THREE.CylinderGeometry(0.24, 0.24, 3.1, 8);
+    const winGeo = new THREE.BoxGeometry(2.2, 1.7, 0.2);
+    const yardGeo = new THREE.PlaneGeometry(38, 38);
+    yardGeo.rotateX(-Math.PI * 0.5);
     const ringGeo = new THREE.RingGeometry(3.4, 4.4, 24);
     ringGeo.rotateX(-Math.PI * 0.5);
 
     for (let i = 0; i < count; i++) {
-      const idx = Math.floor(((i + 0.5) / count) * this.blockCenters.length);
-      const b = this.blockCenters[idx];
+      const keys = Array.from(this.pizzaBlockKeys || []);
+      const b = this.blockCenters[keys[i]];
       if (!b) continue;
       const px = b.x;
-      const pz = b.z + WORLD_CFG.blockSize * 0.22;
+      const pz = b.z;
       const color = (cfg.shopPalette || [0xef4444])[i % (cfg.shopPalette || [0xef4444]).length];
 
       const group = new THREE.Group();
       group.position.set(px, 0, pz);
-      const base = new THREE.Mesh(baseGeo, wallMat);
-      base.position.y = 1.6;
+
+      const yard = new THREE.Mesh(yardGeo, yardMat);
+      yard.position.y = 0.26;
+      yard.receiveShadow = true;
+      group.add(yard);
+
+      const base = new THREE.Mesh(bodyGeo, wallMat);
+      base.position.y = 2.75;
       base.castShadow = true;
+      base.receiveShadow = true;
       group.add(base);
-      const roof = new THREE.Mesh(roofGeo, roofMat);
-      roof.position.y = 3.5;
-      group.add(roof);
+
+      const gableL = new THREE.Mesh(gableGeo, roofMat);
+      gableL.position.set(-4.1, 6.3, 0);
+      gableL.rotation.z = 0.42;
+      gableL.castShadow = true;
+      group.add(gableL);
+      const gableR = new THREE.Mesh(gableGeo, roofMat);
+      gableR.position.set(4.1, 6.3, 0);
+      gableR.rotation.z = -0.42;
+      gableR.castShadow = true;
+      group.add(gableR);
+
+      const porch = new THREE.Mesh(porchGeo, trimMat);
+      porch.position.set(0, 0.45, 7.6);
+      group.add(porch);
+      for (const cx of [-6.5, 6.5]) {
+        const col = new THREE.Mesh(colGeo, trimMat);
+        col.position.set(cx, 2.1, 8.2);
+        group.add(col);
+      }
+      for (const wx of [-4.5, 0, 4.5]) {
+        const win = new THREE.Mesh(winGeo, winMat);
+        win.position.set(wx, 3.1, 6.62);
+        group.add(win);
+      }
 
       const canvas = document.createElement('canvas');
       canvas.width = 256;
@@ -497,25 +544,23 @@ _buildWindowTextures() {
       const signTex = new THREE.CanvasTexture(canvas);
       signTex.colorSpace = THREE.SRGBColorSpace;
       const sign = new THREE.Mesh(
-        new THREE.PlaneGeometry(6.4, 1.6),
+        new THREE.PlaneGeometry(7, 1.75),
         new THREE.MeshBasicMaterial({ map: signTex, side: THREE.DoubleSide })
       );
-      sign.position.set(0, 2.4, 3.6);
+      sign.position.set(0, 4.6, 6.8);
       group.add(sign);
 
-      const glowMat = new THREE.MeshBasicMaterial({
+      const ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({
         color, transparent: true, opacity: 0.7, side: THREE.DoubleSide, depthWrite: false
-      });
-      const ring = new THREE.Mesh(ringGeo, glowMat);
-      ring.position.set(0, 0.05, 5.5);
+      }));
+      ring.position.set(0, 0.3, 12);
       group.add(ring);
 
       this.cityGroup.add(group);
-      const spot = { x: px, z: pz + 5.5 };
-      this.pizzaShops.push(spot);
+      this.pizzaShops.push({ x: px, z: pz + 12 });
       this.colliders.push({
-        minX: px - 4.6, maxX: px + 4.6,
-        minZ: pz - 3.6, maxZ: pz + 3.6
+        minX: px - 8.4, maxX: px + 8.4,
+        minZ: pz - 6.6, maxZ: pz + 6.6
       });
     }
 
@@ -526,16 +571,17 @@ _buildWindowTextures() {
       { x: -edge * 0.5, z: edge },
       { x: edge * 0.55, z: -edge }
     ];
+    const outRoofGeo = new THREE.BoxGeometry(17, 0.8, 14);
     for (let i = 0; i < outposts.length; i++) {
       const o = outposts[i];
       const group = new THREE.Group();
       group.position.set(o.x, 0, o.z);
-      const base = new THREE.Mesh(baseGeo, wallMat);
-      base.position.y = 1.6;
+      const base = new THREE.Mesh(bodyGeo, wallMat);
+      base.position.y = 2.75;
       base.castShadow = true;
       group.add(base);
-      const roof = new THREE.Mesh(roofGeo, roofMat);
-      roof.position.y = 3.5;
+      const roof = new THREE.Mesh(outRoofGeo, roofMat);
+      roof.position.y = 5.8;
       group.add(roof);
 
       const canvas = document.createElement('canvas');
@@ -1499,6 +1545,7 @@ _buildGreenDistricts() {
     let placed = 0;
 
     for (let i = 0; i < this.blockCenters.length && placed < 260; i++) {
+      if (this.pizzaBlockKeys && this.pizzaBlockKeys.has(i)) continue;
       const b = this.blockCenters[i];
       const nx = b.bx / maxIdx;
       const nz = b.bz / maxIdx;
@@ -2222,6 +2269,7 @@ _buildNaturalHomes() {
     let built = 0;
 
     for (let i = 0; i < this.blockCenters.length && built < 130; i++) {
+      if (this.pizzaBlockKeys && this.pizzaBlockKeys.has(i)) continue;
       const b = this.blockCenters[i];
       const nx = b.bx / maxIdx;
       const nz = b.bz / maxIdx;
@@ -2338,6 +2386,7 @@ _decorateBuildings() {
     let added = 0;
 
     for (let i = 0; i < this.blockCenters.length && added < 140; i++) {
+      if (this.pizzaBlockKeys && this.pizzaBlockKeys.has(i)) continue;
       const b = this.blockCenters[i];
       const nx = b.bx / maxIdx;
       const nz = b.bz / maxIdx;
