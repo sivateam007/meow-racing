@@ -250,6 +250,23 @@ setVehicleType(typeKey) {
     }
   }
 
+  setBodyColor(hex) {
+    if (typeof hex !== 'number') return;
+    if (this.bodyMat) {
+      this.bodyMat.color.setHex(hex);
+      if (this.bodyMat.emissive) this.bodyMat.emissive.setHex(0x000000);
+    }
+    if (this.accentMat) {
+      const c = new THREE.Color(hex);
+      this.accentMat.color.setRGB(
+        Math.min(1, c.r * 0.75 + 0.2),
+        Math.min(1, c.g * 0.75 + 0.2),
+        Math.min(1, c.b * 0.75 + 0.2)
+      );
+    }
+    this.bodyColor = hex;
+  }
+
   setSpeedLevel(index = 1) {
     const i = clamp(Math.round(index), 0, SPEED_LEVELS.length - 1);
     const level = SPEED_LEVELS[i];

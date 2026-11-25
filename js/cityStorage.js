@@ -12,6 +12,7 @@ const DEFAULT_PROFILE = {
   currentVehicle: 'sedan',
   layout: 'compact',
   speedLevel: 1,
+  vehicleColors: {},
   missionsCompleted: [],
   activeMission: null,
   xp: 0,
@@ -77,6 +78,13 @@ function sanitize(raw) {
   }
   if (['compact', 'large', 'left', 'right'].includes(raw.layout)) p.layout = raw.layout;
   p.speedLevel = Math.min(2, Math.max(0, Math.floor(num(raw.speedLevel, 1))));
+  if (raw.vehicleColors && typeof raw.vehicleColors === 'object' && !Array.isArray(raw.vehicleColors)) {
+    for (const [key, value] of Object.entries(raw.vehicleColors)) {
+      if (typeof key === 'string' && Number.isFinite(value) && value >= 0 && value <= 0xffffff) {
+        p.vehicleColors[key] = Math.floor(value);
+      }
+    }
+  }
   p.missionsCompleted = Array.isArray(raw && raw.missionsCompleted)
     ? raw.missionsCompleted.filter((id) => typeof id === 'string') : [];
   p.activeMission = raw && typeof raw.activeMission === 'string' ? raw.activeMission : null;
@@ -161,6 +169,14 @@ export const CityStorage = {
 
   setLayout(layout) {
     return this.save({ layout });
+  },
+
+  setVehicleColor(type, hex) {
+    const p = read();
+    if (typeof type === 'string' && Number.isFinite(hex)) {
+      p.vehicleColors[type] = Math.floor(hex);
+    }
+    return write(p);
   },
 
   addDistance(meters) {

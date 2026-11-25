@@ -46,10 +46,16 @@ export class World {
 
 _buildWindowTextures() {
     const palettes = [
-      { wallTop: '#334155', wallBot: '#1e293b', frame: '#0f172a', lit: ['#fef08a', '#fde047', '#bae6fd'], dark: '#0b1120', blind: '#475569' },
-      { wallTop: '#475569', wallBot: '#334155', frame: '#1e293b', lit: ['#fde68a', '#fed7aa', '#a5f3fc'], dark: '#111827', blind: '#64748b' },
-      { wallTop: '#293548', wallBot: '#172033', frame: '#090d16', lit: ['#fef9c3', '#7dd3fc', '#fbcfe8'], dark: '#070c18', blind: '#334155' },
-      { wallTop: '#52525b', wallBot: '#27272a', frame: '#18181b', lit: ['#fde047', '#e0f2fe', '#fed7aa'], dark: '#09090b', blind: '#3f3f46' }
+      { wallTop: '#f8fafc', wallBot: '#cbd5e1', frame: '#64748b', lit: ['#fef08a', '#fde047', '#bae6fd'], dark: '#334155', blind: '#94a3b8' },
+      { wallTop: '#fed7aa', wallBot: '#fdba74', frame: '#9a3412', lit: ['#fef9c3', '#fed7aa', '#fef08a'], dark: '#7c2d12', blind: '#f97316' },
+      { wallTop: '#bfdbfe', wallBot: '#93c5fd', frame: '#1e40af', lit: ['#fef08a', '#e0f2fe', '#ffffff'], dark: '#1e3a8a', blind: '#60a5fa' },
+      { wallTop: '#bbf7d0', wallBot: '#86efac', frame: '#166534', lit: ['#fef08a', '#f0fdf4', '#ffffff'], dark: '#14532d', blind: '#4ade80' },
+      { wallTop: '#fbcfe8', wallBot: '#f9a8d4', frame: '#9d174d', lit: ['#fef9c3', '#fce7f3', '#ffffff'], dark: '#831843', blind: '#f472b6' },
+      { wallTop: '#ddd6fe', wallBot: '#c4b5fd', frame: '#5b21b6', lit: ['#fef08a', '#ede9fe', '#ffffff'], dark: '#4c1d95', blind: '#a78bfa' },
+      { wallTop: '#fef08a', wallBot: '#fde047', frame: '#854d0e', lit: ['#ffffff', '#fef9c3', '#fffbeb'], dark: '#713f12', blind: '#eab308' },
+      { wallTop: '#e2e8f0', wallBot: '#94a3b8', frame: '#334155', lit: ['#fef08a', '#bae6fd', '#ffffff'], dark: '#1e293b', blind: '#64748b' },
+      { wallTop: '#a5f3fc', wallBot: '#67e8f9', frame: '#155e75', lit: ['#fef08a', '#ecfeff', '#ffffff'], dark: '#164e63', blind: '#22d3ee' },
+      { wallTop: '#fecaca', wallBot: '#fca5a5', frame: '#991b1b', lit: ['#fef9c3', '#fef2f2', '#ffffff'], dark: '#7f1d1d', blind: '#f87171' }
     ];
 
     this._windowTextureCache = palettes.map((pal, pIdx) => {
@@ -269,6 +275,14 @@ _buildWindowTextures() {
       Math.floor(totalBlocks * 0.46),
       Math.floor(totalBlocks * 0.76)
     ]);
+    this.fuelBlockKeys = new Set(
+      [0.30, 0.55, 0.66, 0.88]
+        .map((f) => Math.floor(totalBlocks * f))
+        .filter((i) => !this.pizzaBlockKeys.has(i))
+    );
+
+    const houseRoofMat = new THREE.MeshStandardMaterial({ color: 0xb91c1c, roughness: 0.8 });
+    const gableGeo = new THREE.BoxGeometry(1, 0.3, 1);
 
     for (let blockIndex = 0; blockIndex < this.blockCenters.length; blockIndex++) {
       const block = this.blockCenters[blockIndex];
@@ -295,7 +309,7 @@ _buildWindowTextures() {
         this.cityGroup.add(bulb);
       }
 
-      if (this.pizzaBlockKeys.has(blockIndex)) continue;
+      if (this.pizzaBlockKeys.has(blockIndex) || (this.fuelBlockKeys && this.fuelBlockKeys.has(blockIndex))) continue;
 
       const subMode = (block.bx + block.bz) % 3;
       const footprints =
@@ -339,6 +353,17 @@ _buildWindowTextures() {
         bldgMesh.castShadow = true;
         bldgMesh.receiveShadow = true;
         this.cityGroup.add(bldgMesh);
+
+        if (height < 20 && blockIndex % 2 === 0) {
+          for (const side of [-1, 1]) {
+            const gable = new THREE.Mesh(gableGeo, houseRoofMat);
+            gable.scale.set(fp.w * 0.62, 1, fp.d * 1.06);
+            gable.position.set(bx + side * fp.w * 0.26, swH + height + 0.5, bz);
+            gable.rotation.z = side * -0.4;
+            gable.castShadow = true;
+            this.cityGroup.add(gable);
+          }
+        }
 
         this.colliders.push({
           minX: bx - fp.w * 0.5,
@@ -1611,7 +1636,7 @@ _buildGreenDistricts() {
     let placed = 0;
 
     for (let i = 0; i < this.blockCenters.length && placed < 260; i++) {
-      if (this.pizzaBlockKeys && this.pizzaBlockKeys.has(i)) continue;
+      if ((this.pizzaBlockKeys && this.pizzaBlockKeys.has(i)) || (this.fuelBlockKeys && this.fuelBlockKeys.has(i))) continue;
       const b = this.blockCenters[i];
       const nx = b.bx / maxIdx;
       const nz = b.bz / maxIdx;
@@ -1729,6 +1754,8 @@ _buildGreenDistricts() {
 
     const ax = half - 54;
     const az = -half + 54;
+    this.airportCenter = { x: ax, z: az };
+    this.planes = [];
     const runway = new THREE.Mesh(new THREE.BoxGeometry(18, 0.08, 110), tarmacMat);
     runway.position.set(ax, 0.04, az);
     runway.receiveShadow = true;
@@ -1755,6 +1782,30 @@ _buildGreenDistricts() {
       });
     }
 
+    const terminal = new THREE.Mesh(new THREE.BoxGeometry(24, 8, 14), new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.6 }));
+    terminal.position.set(ax - 28, 4, az + 40);
+    terminal.castShadow = true;
+    this.cityGroup.add(terminal);
+    const termCanvas = document.createElement('canvas');
+    termCanvas.width = 512;
+    termCanvas.height = 96;
+    const tCtx = termCanvas.getContext('2d');
+    tCtx.fillStyle = '#0f172a';
+    tCtx.fillRect(0, 0, 512, 96);
+    tCtx.fillStyle = '#38bdf8';
+    tCtx.font = '900 40px sans-serif';
+    tCtx.textAlign = 'center';
+    tCtx.textBaseline = 'middle';
+    tCtx.fillText('AIRPORT', 256, 50);
+    const termTex = new THREE.CanvasTexture(termCanvas);
+    termTex.colorSpace = THREE.SRGBColorSpace;
+    const termSign = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 2.2),
+      new THREE.MeshBasicMaterial({ map: termTex, side: THREE.DoubleSide })
+    );
+    termSign.position.set(ax - 28, 9.4, az + 47.2);
+    this.cityGroup.add(termSign);
+
     for (let p = 0; p < 2; p++) {
       const plane = new THREE.Group();
       const fuselage = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.1, 9.5, 10), planeMat);
@@ -1771,31 +1822,36 @@ _buildGreenDistricts() {
 
       plane.position.set(ax - 2 + p * 4, 1.15, az - 18 + p * 36);
       this.cityGroup.add(plane);
+      this.planes.push({ group: plane, home: { x: plane.position.x, z: plane.position.z } });
     }
   }
 
-  _buildFuelStation() {
+_buildFuelStation() {
     if (!this.cityGroup) return;
 
-    const streets = Array.isArray(this.streetCoords) && this.streetCoords.length > 0 ? this.streetCoords : [0];
-    const len = streets.length;
-    const at = (f) => streets[Math.min(len - 1, Math.max(0, Math.floor(len * f)))] || 0;
-    const off = (WORLD_CFG.roadWidth || 14) * 0.5 + 8;
-
-    const spots = [
-      { x: at(0.22) + off, z: at(0.22) + 12 },
-      { x: at(0.78) + off, z: at(0.22) + 12 },
-      { x: at(0.22) + off, z: at(0.78) + 12 },
-      { x: at(0.78) + off, z: at(0.78) + 12 }
-    ];
+    const keys = Array.from(this.fuelBlockKeys || []);
+    const spots = keys.map((idx) => {
+      const b = this.blockCenters[idx];
+      return b ? { x: b.x, z: b.z } : { x: 0, z: 0 };
+    });
     this.fuelStations = spots.map((s) => ({ x: s.x, z: s.z }));
     this.fuelStation = this.fuelStations[0];
 
-    const canopyMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.35, metalness: 0.4 });
-    const pillarMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.5 });
-    const pumpMat = new THREE.MeshStandardMaterial({ color: 0x0ea5e9, roughness: 0.4 });
-    const shopMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.65 });
-    const signMat = new THREE.MeshBasicMaterial({ color: 0x4ade80 });
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.65 });
+    const roofMat = new THREE.MeshStandardMaterial({ color: 0x0ea5e9, roughness: 0.7 });
+    const trimMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.5 });
+    const yardMat = new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.92 });
+    const pumpMat = new THREE.MeshStandardMaterial({ color: 0x0ea5e9, roughness: 0.4, metalness: 0.35 });
+    const winMat = new THREE.MeshStandardMaterial({ color: 0xfef08a, emissive: 0xf59e0b, emissiveIntensity: 0.7 });
+
+    const bodyGeo = new THREE.BoxGeometry(16, 5, 13);
+    const gableGeo = new THREE.BoxGeometry(9.2, 0.5, 14);
+    const yardGeo = new THREE.PlaneGeometry(34, 34);
+    yardGeo.rotateX(-Math.PI * 0.5);
+    const porchGeo = new THREE.BoxGeometry(16, 0.4, 3);
+    const colGeo = new THREE.CylinderGeometry(0.24, 0.24, 3, 8);
+    const winGeo = new THREE.BoxGeometry(2.2, 1.7, 0.2);
+    const pumpGeo = new THREE.BoxGeometry(1.4, 2.2, 1.4);
 
     const radius = (typeof FUEL !== 'undefined' && FUEL.stationRadius) || 11;
     const ringGeo = new THREE.RingGeometry(radius - 0.7, radius, 32);
@@ -1808,39 +1864,68 @@ _buildGreenDistricts() {
       const group = new THREE.Group();
       group.position.set(st.x, 0, st.z);
 
-      const canopy = new THREE.Mesh(new THREE.BoxGeometry(12, 0.6, 9), canopyMat);
-      canopy.position.set(0, 4.4, 0);
-      canopy.castShadow = true;
-      group.add(canopy);
+      const yard = new THREE.Mesh(yardGeo, yardMat);
+      yard.position.set(0, 0.26, 4);
+      yard.receiveShadow = true;
+      group.add(yard);
 
-      for (const [px, pz] of [[-4.8, -3.4], [4.8, -3.4], [-4.8, 3.4], [4.8, 3.4]]) {
-        const pillar = new THREE.Mesh(new THREE.BoxGeometry(0.5, 4.4, 0.5), pillarMat);
-        pillar.position.set(px, 2.2, pz);
-        group.add(pillar);
+      const body = new THREE.Mesh(bodyGeo, wallMat);
+      body.position.set(0, 2.75, 8);
+      body.castShadow = true;
+      body.receiveShadow = true;
+      group.add(body);
+
+      for (const side of [-1, 1]) {
+        const gable = new THREE.Mesh(gableGeo, roofMat);
+        gable.position.set(side * 4.1, 6.3, 8);
+        gable.rotation.z = side * -0.42;
+        gable.castShadow = true;
+        group.add(gable);
       }
 
-      for (const pmx of [-2.4, 2.4]) {
-        const pump = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.8, 1.1), pumpMat);
-        pump.position.set(pmx, 0.9, 0);
+      const porch = new THREE.Mesh(porchGeo, trimMat);
+      porch.position.set(0, 0.45, 12);
+      group.add(porch);
+      for (const cx of [-6.5, 6.5]) {
+        const col = new THREE.Mesh(colGeo, trimMat);
+        col.position.set(cx, 2.1, 12.6);
+        group.add(col);
+      }
+      for (const wx of [-4.5, 0, 4.5]) {
+        const win = new THREE.Mesh(winGeo, winMat);
+        win.position.set(wx, 3.1, 14.62);
+        group.add(win);
+      }
+
+      for (const pmx of [-3.2, 3.2]) {
+        const pump = new THREE.Mesh(pumpGeo, pumpMat);
+        pump.position.set(pmx, 1.1, -5);
         pump.castShadow = true;
         group.add(pump);
         this.colliders.push({
-          minX: st.x + pmx - 0.65, maxX: st.x + pmx + 0.65,
-          minZ: st.z - 0.65, maxZ: st.z + 0.65
+          minX: st.x + pmx - 0.8, maxX: st.x + pmx + 0.8,
+          minZ: st.z - 5.8, maxZ: st.z - 4.2
         });
       }
 
-      const shop = new THREE.Mesh(new THREE.BoxGeometry(8, 3.6, 6), shopMat);
-      shop.position.set(0, 1.8, 13);
-      shop.castShadow = true;
-      group.add(shop);
-      this.colliders.push({
-        minX: st.x - 4.1, maxX: st.x + 4.1,
-        minZ: st.z + 9.4, maxZ: st.z + 16.6
-      });
-
-      const sign = new THREE.Mesh(new THREE.BoxGeometry(3.2, 1.1, 0.3), signMat);
-      sign.position.set(0, 4.9, 0);
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 64;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(0, 0, 256, 64);
+      ctx.fillStyle = '#4ade80';
+      ctx.font = '900 34px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('FUEL', 128, 34);
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      const sign = new THREE.Mesh(
+        new THREE.PlaneGeometry(6.4, 1.6),
+        new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide })
+      );
+      sign.position.set(0, 4.6, 14.8);
       group.add(sign);
 
       const marker = new THREE.Mesh(ringGeo, this.fuelMarkerMat);
@@ -1848,6 +1933,10 @@ _buildGreenDistricts() {
       group.add(marker);
 
       this.cityGroup.add(group);
+      this.colliders.push({
+        minX: st.x - 8.4, maxX: st.x + 8.4,
+        minZ: st.z + 1.4, maxZ: st.z + 14.6
+      });
     }
   }
 
@@ -1876,7 +1965,7 @@ _buildGreenDistricts() {
 
   
 
-_buildRailway() {
+  _buildRailway() {
     if (!this.scene) return;
     if (!this.railwayGroup) {
       this.railwayGroup = new THREE.Group();
@@ -1886,7 +1975,8 @@ _buildRailway() {
 
     const halfSpan = WORLD_CFG.halfSpan || 260;
     const trackLen = halfSpan * 2.1;
-    this.railZ = halfSpan * 0.55;
+    this.railX = (WORLD_CFG.roadWidth || 14) * 0.5 + (WORLD_CFG.blockSize || 44) * 4 + (WORLD_CFG.blockSize || 44) * 0.5;
+    this.railZ = 0;
 
     const railMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.3, metalness: 0.85 });
     const sleeperMat = new THREE.MeshStandardMaterial({ color: 0x451a03, roughness: 0.9 });
@@ -1895,39 +1985,38 @@ _buildRailway() {
     const benchMat = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.65 });
 
     for (const rOff of [-0.75, 0.75]) {
-      const rail = new THREE.Mesh(new THREE.BoxGeometry(trackLen, 0.18, 0.14), railMat);
-      rail.position.set(0, 0.16, this.railZ + rOff);
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.18, trackLen), railMat);
+      rail.position.set(this.railX + rOff, 0.16, 0);
       this.railwayGroup.add(rail);
     }
 
-    const sleeperGeo = new THREE.BoxGeometry(0.32, 0.1, 2.2);
-    for (let x = -halfSpan; x <= halfSpan; x += 2.2) {
+    const sleeperGeo = new THREE.BoxGeometry(2.2, 0.1, 0.32);
+    for (let z = -halfSpan; z <= halfSpan; z += 2.2) {
       const sleeper = new THREE.Mesh(sleeperGeo, sleeperMat);
-      sleeper.position.set(x, 0.06, this.railZ);
+      sleeper.position.set(this.railX, 0.06, z);
       this.railwayGroup.add(sleeper);
     }
 
-    const platX = 0;
-    const platZ = this.railZ + 4.2;
-    const platform = new THREE.Mesh(new THREE.BoxGeometry(28, 0.9, 5.2), platMat);
-    platform.position.set(platX, 0.45, platZ);
+    const platX = this.railX + 4.2;
+    const platform = new THREE.Mesh(new THREE.BoxGeometry(5.2, 0.9, 28), platMat);
+    platform.position.set(platX, 0.45, 0);
     platform.castShadow = true;
     platform.receiveShadow = true;
     this.railwayGroup.add(platform);
 
-    const canopy = new THREE.Mesh(new THREE.BoxGeometry(22, 0.4, 4.2), roofMat);
-    canopy.position.set(platX, 4.4, platZ);
+    const canopy = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.4, 22), roofMat);
+    canopy.position.set(platX, 4.4, 0);
     canopy.castShadow = true;
     this.railwayGroup.add(canopy);
 
-    for (const px of [-8, 0, 8]) {
+    for (const pz of [-8, 0, 8]) {
       const pillar = new THREE.Mesh(new THREE.BoxGeometry(0.35, 3.5, 0.35), roofMat);
-      pillar.position.set(platX + px, 2.65, platZ);
+      pillar.position.set(platX, 2.65, pz);
       this.railwayGroup.add(pillar);
     }
 
-    const bench = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.55, 0.8), benchMat);
-    bench.position.set(platX - 4, 1.18, platZ + 0.8);
+    const bench = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.55, 3.2), benchMat);
+    bench.position.set(platX + 0.8, 1.18, -4);
     this.railwayGroup.add(bench);
 
     const canvas = document.createElement('canvas');
@@ -1944,16 +2033,19 @@ _buildRailway() {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('CENTRAL STATION', 256, 50);
-
     const signTex = new THREE.CanvasTexture(canvas);
     signTex.colorSpace = THREE.SRGBColorSpace;
     const sign = new THREE.Mesh(
       new THREE.PlaneGeometry(12, 2.2),
       new THREE.MeshBasicMaterial({ map: signTex, side: THREE.DoubleSide })
     );
-    sign.position.set(platX, 5.8, platZ);
+    sign.position.set(platX + 0.4, 5.8, 0);
+    sign.rotation.y = Math.PI * 0.5;
     this.railwayGroup.add(sign);
+
+    this.stationPosition = { x: platX, z: 0 };
   }
+
 
   _buildTrain() {
     if (!this.scene) return;
@@ -1967,7 +2059,7 @@ _buildRailway() {
     const count = (typeof TRAIN !== 'undefined' && TRAIN.carCount) || 4;
     const carLen = (typeof TRAIN !== 'undefined' && TRAIN.carLength) || 9;
     const halfSpan = WORLD_CFG.halfSpan || 260;
-    this.trainX = -halfSpan + 20;
+    this.trainZ = -halfSpan + 20;
 
     const locoMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.35, metalness: 0.5 });
     const coachMat = new THREE.MeshStandardMaterial({ color: 0x2563eb, roughness: 0.35, metalness: 0.4 });
@@ -2036,22 +2128,24 @@ _buildRailway() {
     const speed = (typeof TRAIN !== 'undefined' && TRAIN.speed) || 18;
     const carLen = (typeof TRAIN !== 'undefined' && TRAIN.carLength) || 9;
     const halfSpan = WORLD_CFG.halfSpan || 260;
-    const railZ = typeof this.railZ === 'number' ? this.railZ : halfSpan * 0.55;
+    const railX = typeof this.railX === 'number' ? this.railX : 203;
 
-    this.trainX = (typeof this.trainX === 'number' ? this.trainX : -halfSpan) + speed * safeDt;
-    if (this.trainX > halfSpan + carLen * 2) {
-      this.trainX = -halfSpan - carLen * 2;
+    this.trainZ = (typeof this.trainZ === 'number' ? this.trainZ : -halfSpan + 20) + speed * safeDt;
+    if (this.trainZ > halfSpan + carLen * 2) {
+      this.trainZ = -halfSpan - carLen * 2;
     }
 
     const wheelDelta = (speed * safeDt) / 0.45;
     for (let i = 0; i < this.trainCars.length; i++) {
       const tc = this.trainCars[i];
-      tc.group.position.set(this.trainX - i * (carLen + 0.6), 0.2, railZ);
+      tc.group.position.set(railX, 0.2, this.trainZ - i * (carLen + 0.6));
+      tc.group.rotation.y = 0;
       for (let w = 0; w < tc.wheels.length; w++) {
         tc.wheels[w].rotation.x -= wheelDelta;
       }
     }
   }
+
 
   _buildVehicleShop() {
     if (!this.scene) return;
@@ -2335,7 +2429,7 @@ _buildNaturalHomes() {
     let built = 0;
 
     for (let i = 0; i < this.blockCenters.length && built < 130; i++) {
-      if (this.pizzaBlockKeys && this.pizzaBlockKeys.has(i)) continue;
+      if ((this.pizzaBlockKeys && this.pizzaBlockKeys.has(i)) || (this.fuelBlockKeys && this.fuelBlockKeys.has(i))) continue;
       const b = this.blockCenters[i];
       const nx = b.bx / maxIdx;
       const nz = b.bz / maxIdx;
@@ -2452,7 +2546,7 @@ _decorateBuildings() {
     let added = 0;
 
     for (let i = 0; i < this.blockCenters.length && added < 140; i++) {
-      if (this.pizzaBlockKeys && this.pizzaBlockKeys.has(i)) continue;
+      if ((this.pizzaBlockKeys && this.pizzaBlockKeys.has(i)) || (this.fuelBlockKeys && this.fuelBlockKeys.has(i))) continue;
       const b = this.blockCenters[i];
       const nx = b.bx / maxIdx;
       const nz = b.bz / maxIdx;

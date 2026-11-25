@@ -30,6 +30,9 @@ export class Game {
     this.speedLevel = this.profile.speedLevel ?? 1;
     this.faresCompleted = this.profile.faresCompleted || 0;
     this.activeMission = null;
+    this.rideMode = null;
+    this.rideVehicle = null;
+    this.planeRide = null;
     this.health = SURVIVAL.maxHealth;
     this._lastCrashTime = -999;
     this._lastCarPos = null;
@@ -233,6 +236,10 @@ export class Game {
         if (this.car && typeof this.car.setVehicleType === 'function') {
           this.car.setVehicleType(vType);
         }
+        const savedColor = CityStorage.get().vehicleColors[vType];
+        if (typeof savedColor === 'number' && this.car && typeof this.car.setBodyColor === 'function') {
+          this.car.setBodyColor(savedColor);
+        }
         if (typeof this._toast === 'function') {
           this._toast(unlocked && vType === 'bike' ? 'BIKE UNLOCKED - PRESS GAS TO RIDE'
             : unlocked ? `${vType.toUpperCase()} UNLOCKED - READY TO DRIVE`
@@ -254,6 +261,19 @@ export class Game {
           const show = cat === 'all' || vCat === cat;
           vBtn.style.display = show ? '' : 'none';
         });
+      });
+    });
+
+    document.querySelectorAll('[data-color]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const hex = Number(btn.getAttribute('data-color'));
+        if (!Number.isFinite(hex)) return;
+        if (this.car && typeof this.car.setBodyColor === 'function') this.car.setBodyColor(hex);
+        CityStorage.setVehicleColor(this.currentVehicle, hex);
+        document.querySelectorAll('[data-color]').forEach((b) => b.classList.toggle('active', b === btn));
+        this._toast('COLOUR APPLIED', 1400);
       });
     });
 
@@ -394,6 +414,9 @@ export class Game {
         const btn = document.getElementById('touch-speed');
         if (btn) btn.click();
       }
+      if (e.code === 'KeyE') {
+        this._tryRide();
+      }
     });
   }
 
@@ -442,8 +465,15 @@ export class Game {
     this.level = profile.level || 1;
     this.faresCompleted = profile.faresCompleted || 0;
     this.activeMission = null;
+    this.rideMode = null;
+    this.rideVehicle = null;
+    this.planeRide = null;
     this._clearPizzaMarker();
     this.pizzaJob = null;
+    if (this.rideMode) this.car.group.visible = true;
+    this.rideMode = null;
+    this.rideVehicle = null;
+    this.planeRide = null;
     this.ownedVehicles = Array.isArray(profile.ownedVehicles) && profile.ownedVehicles.length
       ? profile.ownedVehicles.slice() : ['sedan'];
     this.currentVehicle = this.ownedVehicles.includes(profile.currentVehicle) ? profile.currentVehicle : 'sedan';
@@ -453,6 +483,10 @@ export class Game {
     }
     if (this.car && typeof this.car.setVehicleType === 'function') {
       this.car.setVehicleType(this.currentVehicle);
+    }
+    const startColor = profile.vehicleColors && profile.vehicleColors[this.currentVehicle];
+    if (typeof startColor === 'number' && this.car && typeof this.car.setBodyColor === 'function') {
+      this.car.setBodyColor(startColor);
     }
     this.health = SURVIVAL.maxHealth;
     this._lastCarPos = null;
@@ -1006,6 +1040,72 @@ _clearMissionMarker() {
     }
   }
 
+  _tryRide() {
+    if (this.rideMode) { this._exitRide(); return; }
+    const w = this.world;
+    if (!w) return;
+    const p = this.car.getPosition();
+    let best = null;
+    let bestD = Infinity;
+    let kind = null;
+    for (const tc of (w.trainCars || [])) {
+      const q = tc.group.position;
+      const d = Math.hypot(q.x - p.x, q.z - p.z);
+      if (d < 10 && d < bestD) { bestD = d; best = tc.group; kind = 'train'; }
+    }
+    for (const pl of (w.planes || [])) {
+      const q = pl.group.position;
+      const d = Math.hypot(q.x - p.x, q.z - p.z);
+      if (d < 12 && d < bestD) { bestD = d; best = pl.group; kind = 'plane'; }
+    }
+    if (!best) { this._toast('NO TRAIN OR PLANE NEARBY', 1800); return; }
+    this.rideMode = kind;
+    this.rideVehicle = best;
+    this.car.group.visible = false;
+    if (kind === 'plane') {
+      this.planeRide = { speed: 0, heading: best.rotation.y || 0, alt: best.position.y };
+    }
+    this._toast(kind === 'train' ? 'RIDING TRAIN - RIDE AGAIN TO EXIT' : 'RIDING PLANE - RIDE AGAIN TO EXIT', 2200);
+  }
+
+  _exitRide() {
+    if (!this.rideMode) return;
+    const pos = this.rideVehicle ? this.rideVehicle.position : this.car.getPosition();
+    this.car.group.position.set(pos.x, 0, pos.z);
+    this.car.group.visible = true;
+    this.car.speed = 0;
+    this.rideMode = null;
+    this.rideVehicle = null;
+    this.planeRide = null;
+    this._toast('LEFT VEHICLE', 1600);
+  }
+
+  _updateRide(dt, input) {
+    if (!this.rideMode || !this.rideVehicle) return;
+    const v = this.rideVehicle;
+    if (this.rideMode === 'train') {
+      this.car.group.position.set(v.position.x, 0, v.position.z);
+      this.car.heading = 0;
+      return;
+    }
+    const r = this.planeRide;
+    if (!r) return;
+    const safe = Math.min(dt, 0.05);
+    if (input.forward) r.speed = Math.min(48, r.speed + 18 * safe);
+    else if (input.backward) r.speed = Math.max(0, r.speed - 20 * safe);
+    else r.speed = Math.max(0, r.speed - 4 * safe);
+    if (input.left) r.heading += 0.7 * safe;
+    if (input.right) r.heading -= 0.7 * safe;
+    const targetAlt = r.speed > 16 ? Math.min(90, 1.15 + (r.speed - 16) * 2.2) : 1.15;
+    r.alt += (targetAlt - r.alt) * Math.min(1, safe * 0.8);
+    v.position.x += -Math.sin(r.heading) * r.speed * safe;
+    v.position.z += -Math.cos(r.heading) * r.speed * safe;
+    v.position.y = r.alt;
+    v.rotation.y = r.heading;
+    v.rotation.x = Math.max(-0.25, Math.min(0.25, (targetAlt - r.alt) * 0.02));
+    this.car.group.position.set(v.position.x, 0, v.position.z);
+  }
+
   _startMission(id) {
     this._clearMissionMarker();
     const missions = typeof MISSION_LIST !== 'undefined' ? MISSION_LIST : [];
@@ -1364,6 +1464,19 @@ _clearMissionMarker() {
       ctx.fillText('P', fx - 2, fy - 7);
     }
 
+    const landmarks = [];
+    if (this.world.stationPosition) landmarks.push({ ...this.world.stationPosition, color: '#f472b6', label: 'T' });
+    if (this.world.airportCenter) landmarks.push({ ...this.world.airportCenter, color: '#a78bfa', label: 'A' });
+    for (const lm of landmarks) {
+      const lx = toX(lm.x);
+      const ly = toY(lm.z);
+      if (lx < -6 || lx > w + 6 || ly < -6 || ly > h + 6) continue;
+      ctx.fillStyle = lm.color;
+      ctx.fillRect(lx - 3, ly - 3, 6, 6);
+      ctx.font = 'bold 8px sans-serif';
+      ctx.fillText(lm.label, lx - 2, ly - 7);
+    }
+
     let obj = null;
     let color = '#facc15';
     let label = 'P';
@@ -1463,9 +1576,13 @@ _clearMissionMarker() {
       }
     }
 
-    this.car.update(dt, input);
-    if (this.state === 'play') {
-      this._resolveCollisions(dt);
+    if (this.rideMode) {
+      this._updateRide(dt, input);
+    } else {
+      this.car.update(dt, input);
+      if (this.state === 'play') {
+        this._resolveCollisions(dt);
+      }
     }
 
     const carPos = this.car.getPosition();
