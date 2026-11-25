@@ -171,7 +171,7 @@ export class Effects {
     });
   }
 
-  setDayNight(t = 0) {
+setDayNight(t = 0) {
     const phase = ((t % 1) + 1) % 1;
     const daylight = 0.5 + 0.5 * Math.cos(phase * Math.PI * 2);
 
@@ -184,10 +184,30 @@ export class Effects {
       if (this.scene.fog) {
         this.scene.fog.color.copy(fogCol);
       }
+      this.scene.traverse((obj) => {
+        if (!obj.isMesh || !obj.material) return;
+        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+        for (let i = 0; i < mats.length; i++) {
+          const m = mats[i];
+          if (m && 'emissiveIntensity' in m && m.emissive && m.emissive.getHex() !== 0x000000) {
+            m.emissiveIntensity = lerp(1.45, 0.25, daylight);
+          }
+        }
+      });
     }
+
     if (this.sunLight) {
       this.sunLight.color.copy(sunCol);
-      this.sunLight.intensity = lerp(0.55, 1.55, daylight);
+      this.sunLight.intensity = lerp(0.55, 1.75, daylight);
+    }
+
+    if (this.scene && Array.isArray(this.scene.children)) {
+      for (let i = 0; i < this.scene.children.length; i++) {
+        const child = this.scene.children[i];
+        if (child && child.isHemisphereLight) {
+          child.intensity = lerp(0.55, 1.35, daylight);
+        }
+      }
     }
   }
 

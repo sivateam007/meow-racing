@@ -304,6 +304,7 @@ export class World {
     this._buildVehicleShop();
     this._buildNaturalHomes();
     this._decorateBuildings();
+    this._addStreetDetails();
   }
 
   _buildSkyline() {
@@ -1975,79 +1976,237 @@ _buildRailway() {
   }
 // Note: Call this._buildRailway(), this._buildTrain(), and this._buildVehicleShop() at the end of buildCity(); call this._updateTrain(dt) and this._updateTaxiMarker(dt) inside update().
 
+  _addStreetDetails() {
+    if (!this.cityGroup || !Array.isArray(this.streetCoords) || this.streetCoords.length === 0) return;
+
+    const poleMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.45, metalness: 0.7 });
+    const bulbMat = new THREE.MeshStandardMaterial({
+      color: 0xfef08a,
+      emissive: 0xfbbf24,
+      emissiveIntensity: 1.1,
+      roughness: 0.2
+    });
+    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5c3a21, roughness: 0.85 });
+    const foliageMat = new THREE.MeshStandardMaterial({ color: 0x16a34a, roughness: 0.78 });
+    const benchMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.7 });
+    const shelterMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5, metalness: 0.5 });
+    const glassMat = new THREE.MeshStandardMaterial({
+      color: 0xbae6fd,
+      transparent: true,
+      opacity: 0.35,
+      roughness: 0.1,
+      metalness: 0.8
+    });
+    const binMat = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.65 });
+    const cwMat = new THREE.MeshBasicMaterial({ color: 0xf8fafc });
+
+    const poleGeo = new THREE.CylinderGeometry(0.08, 0.12, 5.6, 8);
+    const bulbGeo = new THREE.SphereGeometry(0.24, 8, 8);
+    const trunkGeo = new THREE.CylinderGeometry(0.16, 0.24, 2.4, 6);
+    const crownGeo = new THREE.ConeGeometry(1.35, 2.8, 6);
+    const benchGeo = new THREE.BoxGeometry(1.7, 0.42, 0.6);
+    const roofGeo = new THREE.BoxGeometry(3.4, 0.2, 1.8);
+    const postGeo = new THREE.BoxGeometry(0.14, 2.6, 0.14);
+    const paneGeo = new THREE.BoxGeometry(3.0, 1.8, 0.08);
+    const binGeo = new THREE.BoxGeometry(0.62, 0.9, 0.62);
+    const cwGeo = new THREE.PlaneGeometry(0.55, 2.4);
+    cwGeo.rotateX(-Math.PI * 0.5);
+
+    const roadW = WORLD_CFG.roadWidth || 14;
+    const edgeOffset = roadW * 0.5 + 1.1;
+    let count = 0;
+
+    for (let i = 0; i < this.streetCoords.length && count < 180; i++) {
+      const s = this.streetCoords[i];
+
+      for (let j = 0; j < this.streetCoords.length && count < 180; j += 2) {
+        const ix = this.streetCoords[j];
+        const iz = s;
+
+        for (const [dx, dz] of [
+          [-1, -1],
+          [1, 1]
+        ]) {
+          const cw = new THREE.Mesh(cwGeo, cwMat);
+          cw.position.set(ix + dx * 1.4, 0.035, iz + dz * (roadW * 0.5 + 1.4));
+          this.cityGroup.add(cw);
+          count++;
+        }
+
+        const lx = ix + edgeOffset;
+        const lz = iz + 12;
+        const pole = new THREE.Mesh(poleGeo, poleMat);
+        pole.position.set(lx, 2.8, lz);
+        pole.castShadow = true;
+        this.cityGroup.add(pole);
+
+        const bulb = new THREE.Mesh(bulbGeo, bulbMat);
+        bulb.position.set(lx - 0.35, 5.6, lz);
+        this.cityGroup.add(bulb);
+        count += 2;
+      }
+
+      if (i % 2 === 0) {
+        const tx = s + edgeOffset;
+        const tz = 0;
+        const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+        trunk.position.set(tx, 1.2, tz);
+        trunk.castShadow = true;
+        this.cityGroup.add(trunk);
+
+        const crown = new THREE.Mesh(crownGeo, foliageMat);
+        crown.position.set(tx, 3.4, tz);
+        crown.castShadow = true;
+        this.cityGroup.add(crown);
+
+        const bench = new THREE.Mesh(benchGeo, benchMat);
+        bench.position.set(tx + 0.3, 0.21, tz + 5.5);
+        this.cityGroup.add(bench);
+
+        const bin = new THREE.Mesh(binGeo, binMat);
+        bin.position.set(tx + 0.35, 0.45, tz + 7.2);
+        this.cityGroup.add(bin);
+        count += 4;
+      }
+
+      if (i === Math.floor(this.streetCoords.length * 0.5)) {
+        const bx = s + edgeOffset + 0.4;
+        const bz = -16;
+        const shelter = new THREE.Group();
+        shelter.position.set(bx, 0, bz);
+
+        const bRoof = new THREE.Mesh(roofGeo, shelterMat);
+        bRoof.position.y = 2.65;
+        bRoof.castShadow = true;
+        shelter.add(bRoof);
+
+        for (const px of [-1.4, 1.4]) {
+          const p = new THREE.Mesh(postGeo, shelterMat);
+          p.position.set(px, 1.3, 0);
+          shelter.add(p);
+        }
+
+        const pane = new THREE.Mesh(paneGeo, glassMat);
+        pane.position.set(0, 1.25, -0.75);
+        shelter.add(pane);
+
+        this.cityGroup.add(shelter);
+        count += 4;
+      }
+    }
+  }
+
 _buildNaturalHomes() {
     if (!this.cityGroup || !Array.isArray(this.blockCenters)) return;
 
-    const pastelColors = [0xfde68a, 0xfbcfe8, 0xbfdbfe, 0xdbf4ff, 0xfef3c7];
+    const pastelColors = [0xfde68a, 0xfbcfe8, 0xbfdbfe, 0xdbf4ff, 0xfef3c7, 0xd8b4fe];
     const roofMat = new THREE.MeshStandardMaterial({ color: 0x991b1b, roughness: 0.72 });
-    const trimMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.5 });
+    const trimMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.48 });
     const chimneyMat = new THREE.MeshStandardMaterial({ color: 0x7c2d12, roughness: 0.85 });
-    const gardenMat = new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.9 });
-    const flowerBoxMat = new THREE.MeshBasicMaterial({ color: 0xf43f5e });
+    const yardMat = new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.9 });
+    const driveMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.85 });
+    const flowerMat = new THREE.MeshBasicMaterial({ color: 0xf43f5e });
+    const winGlowMat = new THREE.MeshStandardMaterial({
+      color: 0xfef08a,
+      emissive: 0xf59e0b,
+      emissiveIntensity: 0.65,
+      roughness: 0.25
+    });
 
-    const roofGeo = new THREE.ConeGeometry(4.5, 2.3, 4);
-    const chimneyGeo = new THREE.BoxGeometry(0.65, 1.8, 0.65);
-    const porchGeo = new THREE.BoxGeometry(5.8, 0.35, 1.5);
-    const balconyGeo = new THREE.BoxGeometry(3.2, 0.25, 1.1);
-    const flowerGeo = new THREE.BoxGeometry(1.1, 0.28, 0.25);
-    const plotGeo = new THREE.PlaneGeometry(11, 11);
-    plotGeo.rotateX(-Math.PI * 0.5);
+    const yardGeo = new THREE.PlaneGeometry(12.5, 12.5);
+    yardGeo.rotateX(-Math.PI * 0.5);
+    const driveGeo = new THREE.PlaneGeometry(3.2, 6.2);
+    driveGeo.rotateX(-Math.PI * 0.5);
+    const wallGeo = new THREE.BoxGeometry(5.8, 3.5, 5.2);
+    const gableSlopeGeo = new THREE.BoxGeometry(4.2, 0.24, 5.5);
+    const chimneyGeo = new THREE.BoxGeometry(0.65, 1.9, 0.65);
+    const porchGeo = new THREE.BoxGeometry(5.8, 0.3, 1.6);
+    const colGeo = new THREE.CylinderGeometry(0.12, 0.12, 2.5, 6);
+    const flowerGeo = new THREE.BoxGeometry(1.2, 0.26, 0.26);
+    const winGeo = new THREE.BoxGeometry(0.95, 0.85, 0.14);
+    const fenceRailGeo = new THREE.BoxGeometry(12.2, 0.14, 0.12);
 
     const maxIdx = Math.max(1, WORLD_CFG.blocksPerSide - 1);
     let built = 0;
 
-    for (let i = 0; i < this.blockCenters.length && built < 90; i++) {
+    for (let i = 0; i < this.blockCenters.length && built < 130; i++) {
       const b = this.blockCenters[i];
       const nx = b.bx / maxIdx;
       const nz = b.bz / maxIdx;
-      if (nx > 0.5 || nz > 0.65 || (b.bx + b.bz) % 2 !== 0) continue;
+      if (nx > 0.58 || nz > 0.72) continue;
 
       const facadeMat = new THREE.MeshStandardMaterial({
         color: pastelColors[i % pastelColors.length],
-        roughness: 0.6
+        roughness: 0.62
       });
 
-      const coords = [
-        [-9.5, -8.5],
-        [9.5, 8.5]
+      const plots = [
+        [-10.2, -9.5],
+        [10.2, -9.5],
+        [-10.2, 9.5],
+        [10.2, 9.5]
       ];
-      for (const [hx, hz] of coords) {
-        if (built >= 90) break;
+
+      for (const [hx, hz] of plots) {
+        if (built >= 130) break;
         const home = new THREE.Group();
         home.position.set(b.x + hx, WORLD_CFG.sidewalkHeight, b.z + hz);
 
-        const garden = new THREE.Mesh(plotGeo, gardenMat);
-        garden.position.y = 0.04;
-        garden.receiveShadow = true;
-        home.add(garden);
+        const yard = new THREE.Mesh(yardGeo, yardMat);
+        yard.position.y = 0.03;
+        yard.receiveShadow = true;
+        home.add(yard);
 
-        const wall = new THREE.Mesh(new THREE.BoxGeometry(5.6, 3.6, 5.2), facadeMat);
-        wall.position.y = 1.84;
+        const drive = new THREE.Mesh(driveGeo, driveMat);
+        drive.position.set(1.6, 0.04, 3.2);
+        drive.receiveShadow = true;
+        home.add(drive);
+
+        const wall = new THREE.Mesh(wallGeo, facadeMat);
+        wall.position.y = 1.78;
         wall.castShadow = true;
         wall.receiveShadow = true;
         home.add(wall);
 
-        const roof = new THREE.Mesh(roofGeo, roofMat);
-        roof.position.y = 4.75;
-        roof.rotation.y = Math.PI * 0.25;
-        roof.castShadow = true;
-        home.add(roof);
+        const slopeL = new THREE.Mesh(gableSlopeGeo, roofMat);
+        slopeL.position.set(-1.35, 4.35, 0);
+        slopeL.rotation.z = 0.52;
+        slopeL.castShadow = true;
+        home.add(slopeL);
+
+        const slopeR = new THREE.Mesh(gableSlopeGeo, roofMat);
+        slopeR.position.set(1.35, 4.35, 0);
+        slopeR.rotation.z = -0.52;
+        slopeR.castShadow = true;
+        home.add(slopeR);
 
         const chimney = new THREE.Mesh(chimneyGeo, chimneyMat);
-        chimney.position.set(1.5, 4.9, -1.2);
+        chimney.position.set(1.6, 4.85, -1.2);
         home.add(chimney);
 
         const porch = new THREE.Mesh(porchGeo, trimMat);
-        porch.position.set(0, 0.22, 3.1);
+        porch.position.set(0, 0.18, 3.1);
         home.add(porch);
 
-        const balcony = new THREE.Mesh(balconyGeo, trimMat);
-        balcony.position.set(0, 2.55, 2.95);
-        home.add(balcony);
+        for (const cx of [-2.2, 2.2]) {
+          const col = new THREE.Mesh(colGeo, trimMat);
+          col.position.set(cx, 1.42, 3.65);
+          home.add(col);
+        }
 
-        const flowers = new THREE.Mesh(flowerGeo, flowerBoxMat);
-        flowers.position.set(0, 1.45, 2.66);
+        for (const wx of [-1.5, 1.5]) {
+          const win = new THREE.Mesh(winGeo, winGlowMat);
+          win.position.set(wx, 2.0, 2.64);
+          home.add(win);
+        }
+
+        const flowers = new THREE.Mesh(flowerGeo, flowerMat);
+        flowers.position.set(-1.5, 1.42, 2.68);
         home.add(flowers);
+
+        const fence = new THREE.Mesh(fenceRailGeo, trimMat);
+        fence.position.set(0, 0.75, 6.0);
+        home.add(fence);
 
         this.cityGroup.add(home);
         built++;
@@ -2055,44 +2214,82 @@ _buildNaturalHomes() {
     }
   }
 
-  _decorateBuildings() {
+_decorateBuildings() {
     if (!this.cityGroup || !Array.isArray(this.blockCenters)) return;
 
-    const acMat = new THREE.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 0.5, metalness: 0.4 });
-    const ledgeMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.6 });
-    const antMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.4 });
+    const acMat = new THREE.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 0.45, metalness: 0.5 });
+    const railMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.35, metalness: 0.7 });
+    const tankMat = new THREE.MeshStandardMaterial({ color: 0x7c2d12, roughness: 0.8 });
+    const antMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.35 });
+    const neonMat = new THREE.MeshStandardMaterial({
+      color: 0x38bdf8,
+      emissive: 0x0ea5e9,
+      emissiveIntensity: 1.15,
+      roughness: 0.2
+    });
+    const warmWinMat = new THREE.MeshStandardMaterial({
+      color: 0xfef08a,
+      emissive: 0xfbbf24,
+      emissiveIntensity: 0.85,
+      roughness: 0.25
+    });
 
-    const acGeo = new THREE.BoxGeometry(1.1, 0.85, 0.7);
-    const ledgeGeo = new THREE.BoxGeometry(4.2, 0.22, 0.9);
-    const antGeo = new THREE.CylinderGeometry(0.06, 0.1, 4.5, 6);
+    const acGeo = new THREE.BoxGeometry(1.15, 0.85, 0.75);
+    const balconyGeo = new THREE.BoxGeometry(3.6, 0.22, 1.2);
+    const railGeo = new THREE.BoxGeometry(3.6, 0.75, 0.12);
+    const tankGeo = new THREE.CylinderGeometry(1.3, 1.3, 2.2, 10);
+    const antGeo = new THREE.CylinderGeometry(0.05, 0.09, 5.2, 6);
+    const neonGeo = new THREE.BoxGeometry(4.6, 0.65, 0.25);
+    const stripGeo = new THREE.BoxGeometry(5.2, 0.45, 0.16);
 
     const maxIdx = Math.max(1, WORLD_CFG.blocksPerSide - 1);
     let added = 0;
 
-    for (let i = 0; i < this.blockCenters.length && added < 90; i++) {
+    for (let i = 0; i < this.blockCenters.length && added < 140; i++) {
       const b = this.blockCenters[i];
       const nx = b.bx / maxIdx;
       const nz = b.bz / maxIdx;
-      if (nx < 0.25 || nx > 0.78 || nz < 0.25 || nz > 0.78) continue;
+      if (nx < 0.2 || nx > 0.85 || nz < 0.2 || nz > 0.85) continue;
 
-      const ledge = new THREE.Mesh(ledgeGeo, ledgeMat);
-      ledge.position.set(b.x, 5.5, b.z + WORLD_CFG.blockSize * 0.24);
-      this.cityGroup.add(ledge);
+      const frontZ = b.z + WORLD_CFG.blockSize * 0.25;
+
+      const balcony = new THREE.Mesh(balconyGeo, railMat);
+      balcony.position.set(b.x - 2.5, 6.2, frontZ);
+      this.cityGroup.add(balcony);
+
+      const rail = new THREE.Mesh(railGeo, railMat);
+      rail.position.set(b.x - 2.5, 6.65, frontZ + 0.52);
+      this.cityGroup.add(rail);
 
       const ac = new THREE.Mesh(acGeo, acMat);
-      ac.position.set(b.x + 2.5, 6.2, b.z + WORLD_CFG.blockSize * 0.24);
+      ac.position.set(b.x + 2.8, 7.1, frontZ);
       this.cityGroup.add(ac);
 
-      if (i % 2 === 0) {
-        const ant = new THREE.Mesh(antGeo, antMat);
-        ant.position.set(b.x - 3.5, 16, b.z);
-        this.cityGroup.add(ant);
-        added++;
+      const winStrip = new THREE.Mesh(stripGeo, warmWinMat);
+      winStrip.position.set(b.x, 9.4, frontZ + 0.06);
+      this.cityGroup.add(winStrip);
+
+      added += 4;
+
+      if (i % 2 === 0 && added < 138) {
+        const sign = new THREE.Mesh(neonGeo, neonMat);
+        sign.position.set(b.x, 3.8, frontZ + 0.35);
+        this.cityGroup.add(sign);
+
+        const tank = new THREE.Mesh(tankGeo, tankMat);
+        tank.position.set(b.x + 3.2, 19.5, b.z - 2.0);
+        this.cityGroup.add(tank);
+        added += 2;
       }
-      added += 2;
+
+      if (i % 3 === 0 && added < 139) {
+        const ant = new THREE.Mesh(antGeo, antMat);
+        ant.position.set(b.x - 3.5, 21.0, b.z);
+        this.cityGroup.add(ant);
+        added += 1;
+      }
     }
   }
-// Note: Call this._buildNaturalHomes() and this._decorateBuildings() from buildCity() at the end.
 
   getColliders() {
     return this.colliders;

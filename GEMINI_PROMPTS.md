@@ -141,6 +141,34 @@ Private mode must not throw errors.
 
 ---
 
+## Step 7 — Visuals and natural buildings
+
+> LABEL PATCH 1 — world.js — ADD-ONLY method `_addStreetDetails()`.
+> Along `this.streetCoords` add lamp posts with warm emissive bulbs, street trees, benches,
+> bus-stop shelters with glass, trash bins and crosswalk stripes at intersections. Share materials,
+> cap at ~180 objects, add to `this.cityGroup`. Also add `this._addStreetDetails();` at the end of `buildCity()`.
+>
+> LABEL PATCH 2 — world.js — REPLACEMENT for `_buildNaturalHomes()`.
+> Varied pastel facades, gabled roofs from two rotated boxes, chimneys, porches with columns,
+> fenced yards with grass and flower boxes, driveways, warm emissive windows. Up to 130 homes.
+>
+> LABEL PATCH 3 — world.js — REPLACEMENT for `_decorateBuildings()`.
+> Balconies with railings, rooftop AC units, water tanks, antennas, neon signs, warm window strips.
+>
+> LABEL PATCH 4 — game.js — REPLACEMENT for the lighting section in `_initScene()`.
+> Hemisphere(0xbfe3ff, 0x64748b, 1.25), sun Directional(0xfff4e0, 1.65), 2048 shadow map,
+> shadow camera d=90, sun position (60,95,50). Keep `this.hemiLight` as the variable name.
+>
+> LABEL PATCH 5 — effects.js — REPLACEMENT for `setDayNight(t=0)`.
+> Interpolate sky, fog, sun color/intensity and hemisphere intensity between day/night palettes.
+>
+> LABEL PATCH 6 — css/style.css — ADD-ONLY subtle `body::after` vignette and glow on `.hud-chip`.
+
+**Acceptance:** street lamps, trees, crosswalks and bus stops visible; homes have pitched roofs,
+porches and gardens; softer lighting/shadows; zero console errors; no frame-rate collapse.
+
+---
+
 ## Final validation checklist (run after every step)
 
 ```powershell

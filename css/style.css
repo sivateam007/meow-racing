@@ -834,3 +834,22 @@ body[data-layout="right"] .touch-group-right {
 }
 .hud-action-row-right { justify-content: flex-end; }
 .hud-action-row .touch-btn { pointer-events: auto; }
+/* === VISUAL POLISH (Gemini) === */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 15;
+  background: radial-gradient(circle at center, rgba(0, 0, 0, 0) 64%, rgba(4, 7, 18, 0.42) 100%);
+}
+
+.hud-chip {
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.38), 0 0 12px rgba(56, 189, 248, 0.14);
+}
+
+@media (orientation: landscape) and (max-height: 520px) {
+  body::after {
+    background: radial-gradient(circle at center, rgba(0, 0, 0, 0) 70%, rgba(4, 7, 18, 0.34) 100%);
+  }
+}

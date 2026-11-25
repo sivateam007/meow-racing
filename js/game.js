@@ -86,16 +86,16 @@ export class Game {
       document.body.appendChild(this.renderer.domElement);
     }
 
-    this.hemiLight = new THREE.HemisphereLight(0xe0f2fe, 0x94a3b8, 1.55);
+    this.hemiLight = new THREE.HemisphereLight(0xbfe3ff, 0x64748b, 1.25);
     this.scene.add(this.hemiLight);
 
-    this.sunLight = new THREE.DirectionalLight(COLORS.sunDay, 2.1);
-    this.sunLight.position.set(45, 75, 40);
+    this.sunLight = new THREE.DirectionalLight(0xfff4e0, 1.65);
+    this.sunLight.position.set(60, 95, 50);
     this.sunLight.castShadow = true;
-    this.sunLight.shadow.mapSize.set(1024, 1024);
+    this.sunLight.shadow.mapSize.set(2048, 2048);
     this.sunLight.shadow.camera.near = 5;
-    this.sunLight.shadow.camera.far = 220;
-    const d = 55;
+    this.sunLight.shadow.camera.far = 260;
+    const d = 90;
     this.sunLight.shadow.camera.left = -d;
     this.sunLight.shadow.camera.right = d;
     this.sunLight.shadow.camera.top = d;
