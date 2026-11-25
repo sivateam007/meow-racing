@@ -271,7 +271,13 @@ export class Game {
         e.preventDefault();
         e.stopPropagation();
         if (this.pizzaJob && this.pizzaJob.active && !this.pizzaJob.finished) {
-          this._toast('DELIVERY ALREADY ACTIVE - FINISH IT FIRST', 2000);
+          this.pizzaJob.active = false;
+          this.pizzaJob.finished = true;
+          this.pizzaJob.success = false;
+          this._clearPizzaMarker();
+          this.activeMission = null;
+          this._toast('DELIVERY CANCELLED', 1800);
+          this._updateHud();
           return;
         }
         const missions = typeof MISSION_LIST !== 'undefined' ? MISSION_LIST : [];
