@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+﻿import * as THREE from 'three';
 import {
   WORLD_CFG,
   TRAFFIC_CFG,
@@ -1534,90 +1534,99 @@ _buildGreenDistricts() {
     if (!this.cityGroup) return;
 
     const streets = Array.isArray(this.streetCoords) && this.streetCoords.length > 0 ? this.streetCoords : [0];
-    const midIdx = Math.floor(streets.length * 0.5);
-    const sx = (streets[midIdx] || 0) + (WORLD_CFG.roadWidth || 14) * 0.5 + 8;
-    const sz = (streets[Math.max(0, midIdx - 1)] || 0) + 12;
+    const len = streets.length;
+    const at = (f) => streets[Math.min(len - 1, Math.max(0, Math.floor(len * f)))] || 0;
+    const off = (WORLD_CFG.roadWidth || 14) * 0.5 + 8;
 
-    this.fuelStation = { x: sx, z: sz };
-
-    const group = new THREE.Group();
-    group.position.set(sx, 0, sz);
+    const spots = [
+      { x: at(0.22) + off, z: at(0.22) + 12 },
+      { x: at(0.78) + off, z: at(0.22) + 12 },
+      { x: at(0.22) + off, z: at(0.78) + 12 },
+      { x: at(0.78) + off, z: at(0.78) + 12 }
+    ];
+    this.fuelStations = spots.map((s) => ({ x: s.x, z: s.z }));
+    this.fuelStation = this.fuelStations[0];
 
     const canopyMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.35, metalness: 0.4 });
     const pillarMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.5 });
     const pumpMat = new THREE.MeshStandardMaterial({ color: 0x0ea5e9, roughness: 0.4 });
     const shopMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.65 });
-
-    const canopy = new THREE.Mesh(new THREE.BoxGeometry(12, 0.6, 9), canopyMat);
-    canopy.position.set(0, 4.4, 0);
-    canopy.castShadow = true;
-    group.add(canopy);
-
-    for (const [px, pz] of [
-      [-4.8, -3.4],
-      [4.8, -3.4],
-      [-4.8, 3.4],
-      [4.8, 3.4]
-    ]) {
-      const pillar = new THREE.Mesh(new THREE.BoxGeometry(0.5, 4.4, 0.5), pillarMat);
-      pillar.position.set(px, 2.2, pz);
-      group.add(pillar);
-    }
-
-    for (const pmx of [-2.4, 2.4]) {
-      const pump = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.8, 1.1), pumpMat);
-      pump.position.set(pmx, 0.9, 0);
-      pump.castShadow = true;
-      group.add(pump);
-
-      this.colliders.push({
-        minX: sx + pmx - 0.65,
-        maxX: sx + pmx + 0.65,
-        minZ: sz - 0.65,
-        maxZ: sz + 0.65
-      });
-    }
-
-    const shop = new THREE.Mesh(new THREE.BoxGeometry(8, 3.6, 6), shopMat);
-    shop.position.set(0, 1.8, -9.5);
-    shop.castShadow = true;
-    group.add(shop);
-
-    this.colliders.push({
-      minX: sx - 4.1,
-      maxX: sx + 4.1,
-      minZ: sz - 12.6,
-      maxZ: sz - 6.4
-    });
+    const signMat = new THREE.MeshBasicMaterial({ color: 0x4ade80 });
 
     const radius = (typeof FUEL !== 'undefined' && FUEL.stationRadius) || 11;
     const ringGeo = new THREE.RingGeometry(radius - 0.7, radius, 32);
     ringGeo.rotateX(-Math.PI * 0.5);
     this.fuelMarkerMat = new THREE.MeshBasicMaterial({
-      color: 0x22d3ee,
-      transparent: true,
-      opacity: 0.65,
-      side: THREE.DoubleSide
+      color: 0x22d3ee, transparent: true, opacity: 0.65, side: THREE.DoubleSide
     });
-    const marker = new THREE.Mesh(ringGeo, this.fuelMarkerMat);
-    marker.position.set(0, 0.06, 0);
-    group.add(marker);
 
-    this.cityGroup.add(group);
+    for (const st of this.fuelStations) {
+      const group = new THREE.Group();
+      group.position.set(st.x, 0, st.z);
+
+      const canopy = new THREE.Mesh(new THREE.BoxGeometry(12, 0.6, 9), canopyMat);
+      canopy.position.set(0, 4.4, 0);
+      canopy.castShadow = true;
+      group.add(canopy);
+
+      for (const [px, pz] of [[-4.8, -3.4], [4.8, -3.4], [-4.8, 3.4], [4.8, 3.4]]) {
+        const pillar = new THREE.Mesh(new THREE.BoxGeometry(0.5, 4.4, 0.5), pillarMat);
+        pillar.position.set(px, 2.2, pz);
+        group.add(pillar);
+      }
+
+      for (const pmx of [-2.4, 2.4]) {
+        const pump = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.8, 1.1), pumpMat);
+        pump.position.set(pmx, 0.9, 0);
+        pump.castShadow = true;
+        group.add(pump);
+        this.colliders.push({
+          minX: st.x + pmx - 0.65, maxX: st.x + pmx + 0.65,
+          minZ: st.z - 0.65, maxZ: st.z + 0.65
+        });
+      }
+
+      const shop = new THREE.Mesh(new THREE.BoxGeometry(8, 3.6, 6), shopMat);
+      shop.position.set(0, 1.8, -9.5);
+      shop.castShadow = true;
+      group.add(shop);
+      this.colliders.push({
+        minX: st.x - 4.1, maxX: st.x + 4.1,
+        minZ: st.z - 12.6, maxZ: st.z - 6.4
+      });
+
+      const sign = new THREE.Mesh(new THREE.BoxGeometry(3.2, 1.1, 0.3), signMat);
+      sign.position.set(0, 4.9, 0);
+      group.add(sign);
+
+      const marker = new THREE.Mesh(ringGeo, this.fuelMarkerMat);
+      marker.position.set(0, 0.06, 0);
+      group.add(marker);
+
+      this.cityGroup.add(group);
+    }
   }
 
   _updateFuelStation(dt, playerPos = { x: 0, z: 0 }) {
-    if (!this.fuelStation) return false;
+    const list = (Array.isArray(this.fuelStations) && this.fuelStations.length)
+      ? this.fuelStations
+      : (this.fuelStation ? [this.fuelStation] : []);
+    if (!list.length) return false;
+
     const radius = (typeof FUEL !== 'undefined' && FUEL.stationRadius) || 11;
-    const dist = Math.hypot((playerPos.x || 0) - this.fuelStation.x, (playerPos.z || 0) - this.fuelStation.z);
-    const inside = dist <= radius;
+    let nearest = null;
+    let bestD = Infinity;
+    for (const st of list) {
+      const d = Math.hypot((playerPos.x || 0) - st.x, (playerPos.z || 0) - st.z);
+      if (d < bestD) { bestD = d; nearest = st; }
+    }
+    const inside = bestD <= radius;
 
     if (this.fuelMarkerMat) {
       const pulse = 0.45 + 0.25 * Math.sin((this.time || 0) * (inside ? 9 : 3));
       this.fuelMarkerMat.color.setHex(inside ? 0x4ade80 : 0x22d3ee);
       this.fuelMarkerMat.opacity = pulse;
     }
-
     return inside;
   }
 

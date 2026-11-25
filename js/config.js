@@ -25,7 +25,7 @@ export const COLORS = {
 };
 
 export const WORLD_CFG = {
-  blocksPerSide: 11,
+  blocksPerSide: 14,
   blockSize: 44,
   roadWidth: 14,
   laneOffset: 3.4,
@@ -35,8 +35,8 @@ export const WORLD_CFG = {
   buildingMaxHeight: 42,
   skylineCount: 48,
   skylineRadiusMin: 185,
-  skylineRadiusMax: 270,
-  fogDensity: 0.0042,
+  skylineRadiusMax: 330,
+  fogDensity: 0.0032,
   dayCycleDurationSec: 180,
   lightCycleDurationSec: 16,
   redLightRatio: 0.45,
@@ -333,7 +333,10 @@ export const TAXI = {
   fareBase: 35,
   farePerMeter: 0.5,
   pickupRadius: 8,
-  dropoffRadius: 10
+  dropoffRadius: 10,
+  pickupMarkerRadius: 8,
+  fareSpawnMin: 30,
+  fareSpawnMax: 70
 };
 
 export const SHOP = {

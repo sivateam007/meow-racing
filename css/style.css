@@ -825,3 +825,22 @@ body[data-layout="right"] .touch-group-right {
   }
 }
 #toast:empty { display: none; }
+/* === ACTION BUTTONS: bottom-center, clear of minimap and drive controls === */
+.touch-group-actions {
+  position: fixed;
+  bottom: 96px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+  z-index: 30;
+}
+.touch-group-actions .touch-btn { pointer-events: auto; }
+@media (orientation: landscape) and (max-height: 520px) {
+  .touch-group-actions { bottom: 78px; gap: 6px; }
+  .touch-group-actions .touch-btn {
+    width: 50px; height: 50px; min-width: 48px; min-height: 48px; font-size: 9px;
+  }
+}

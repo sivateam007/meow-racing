@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+﻿import * as THREE from 'three';
 import anime from 'animejs';
 import { WORLD_CFG, CAR_CFG, COLORS, INPUT, SURVIVAL, FUEL, TRAIN, TAXI, SHOP, clamp } from './config.js';
 import Car from './car.js';
@@ -128,8 +128,13 @@ export class Game {
         this.taxiMode = !this.taxiMode;
         if (!this.taxiMode) {
           this.taxiPassenger = null;
+          this.taxiPickupPoint = null;
+          if (typeof this._clearFareMarker === 'function') this._clearFareMarker();
           if (this.world) this.world.taxiTarget = null;
+        } else if (typeof this._startFare === 'function') {
+          this._startFare();
         }
+        this._updateHud();
       } else if (e.code === 'KeyB') {
         const panel = document.getElementById('shop-panel-vehicles');
         if (panel) panel.classList.toggle('hidden');
@@ -195,18 +200,14 @@ export class Game {
     document.querySelectorAll('[data-vehicle]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const vType = btn.getAttribute('data-vehicle');
-        if (!vType || !SHOP || !SHOP.prices) return;
-        const price = SHOP.prices[vType] ?? 500;
+        if (!vType) return;
+        const freeTypes = ['bike', 'coupe', 'muscle', 'supercar', 'bus', 'sedan', 'taxi', 'police'];
+        if (!freeTypes.includes(vType)) return;
         if (!this.ownedVehicles) this.ownedVehicles = ['sedan'];
-        let purchased = false;
+        let unlocked = false;
         if (!this.ownedVehicles.includes(vType)) {
-          if ((this.coins || 0) < price) {
-            if (typeof this._toast === 'function') this._toast(`NEED ${price - (this.coins || 0)} MORE COINS`);
-            return;
-          }
-          this.coins -= price;
           this.ownedVehicles.push(vType);
-          purchased = true;
+          unlocked = true;
           try {
             localStorage.setItem('meow_open_city_vehicles', JSON.stringify(this.ownedVehicles));
           } catch (_) {}
@@ -216,8 +217,8 @@ export class Game {
           this.car.setVehicleType(vType);
         }
         if (typeof this._toast === 'function') {
-          this._toast(purchased && vType === 'bike' ? 'BIKE UNLOCKED - PRESS GAS TO RIDE'
-            : purchased ? `${vType.toUpperCase()} UNLOCKED - READY TO DRIVE`
+          this._toast(unlocked && vType === 'bike' ? 'BIKE UNLOCKED - PRESS GAS TO RIDE'
+            : unlocked ? `${vType.toUpperCase()} UNLOCKED - READY TO DRIVE`
             : `${vType.toUpperCase()} SELECTED`);
         }
         this._updateHud();
@@ -258,7 +259,11 @@ export class Game {
         this.taxiMode = !this.taxiMode;
         if (!this.taxiMode) {
           this.taxiPassenger = null;
+          this.taxiPickupPoint = null;
+          if (typeof this._clearFareMarker === 'function') this._clearFareMarker();
           if (this.world) this.world.taxiTarget = null;
+        } else if (typeof this._startFare === 'function') {
+          this._startFare();
         }
         this._updateHud();
       });
@@ -545,11 +550,99 @@ _toast(msg, ms = 1800) {
     }
   }
 
+  _clearFareMarker() {
+    if (this.taxiFareMarker) {
+      if (this.taxiFareMarker.parent) this.taxiFareMarker.parent.remove(this.taxiFareMarker);
+      this.taxiFareMarker = null;
+    }
+  }
+
+  _startFare() {
+    if (!this.taxiMode || !this.world) return;
+    this._clearFareMarker();
+    this.taxiTarget = null;
+    this.taxiPickupPoint = null;
+    if (this.world) this.world.taxiTarget = null;
+
+    const pPos = this.car && typeof this.car.getPosition === 'function'
+      ? this.car.getPosition() : { x: 0, z: 0 };
+    const streets = Array.isArray(this.world.streetCoords) && this.world.streetCoords.length
+      ? this.world.streetCoords : [0];
+    const min = (typeof TAXI !== 'undefined' && TAXI.fareSpawnMin) || 30;
+    const max = (typeof TAXI !== 'undefined' && TAXI.fareSpawnMax) || 70;
+    const mid = (min + max) * 0.5;
+    let best = null;
+    for (let i = 0; i < 30; i++) {
+      const sx = streets[Math.floor(Math.random() * streets.length)] || 0;
+      const sz = streets[Math.floor(Math.random() * streets.length)] || 0;
+      const d = Math.hypot(sx - pPos.x, sz - pPos.z);
+      if (!best || Math.abs(d - mid) < Math.abs(Math.hypot(best.x - pPos.x, best.z - pPos.z) - mid)) {
+        best = { x: sx, z: sz };
+      }
+      if (d >= min && d <= max) { best = { x: sx, z: sz }; break; }
+    }
+    if (!best) best = { x: pPos.x + min, z: pPos.z + min };
+    this.taxiPickupPoint = best;
+
+    try {
+      const marker = new THREE.Group();
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(2.2, 3.0, 24),
+        new THREE.MeshBasicMaterial({ color: 0xfacc15, transparent: true, opacity: 0.65, side: THREE.DoubleSide, depthWrite: false })
+      );
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.y = 0.08;
+      marker.add(ring);
+      const beam = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.9, 1.7, 9, 12, 1, true),
+        new THREE.MeshBasicMaterial({ color: 0xfde047, transparent: true, opacity: 0.28, depthWrite: false })
+      );
+      beam.position.y = 4.5;
+      marker.add(beam);
+      const body = new THREE.Mesh(
+        new THREE.CapsuleGeometry(0.55, 1.1, 4, 8),
+        new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.5 })
+      );
+      body.position.y = 1.5;
+      marker.add(body);
+      const head = new THREE.Mesh(
+        new THREE.SphereGeometry(0.42, 10, 8),
+        new THREE.MeshStandardMaterial({ color: 0xfef3c7 })
+      );
+      head.position.y = 2.6;
+      marker.add(head);
+      marker.position.set(best.x, 0, best.z);
+      const parent = this.world.scene || this.world.cityGroup;
+      if (parent) parent.add(marker);
+      this.taxiFareMarker = marker;
+    } catch (_) {}
+
+    if (typeof this._toast === 'function') this._toast('NEW FARE - FOLLOW THE MAP MARKER', 2200);
+    this._updateHud();
+  }
+
+  _endFare(farePaid = 0) {
+    this.taxiPassenger = null;
+    this.taxiTarget = null;
+    this.taxiPickupPoint = null;
+    if (this.world) this.world.taxiTarget = null;
+    this._clearFareMarker();
+    if (farePaid > 0 && typeof this._toast === 'function') {
+      this._toast(`FARE PAID $${Math.round(farePaid)}`, 2000);
+    }
+    if (this.taxiMode) this._startFare();
+    this._updateHud();
+  }
+
   _pickupHint(playerPos = { x: 0, z: 0 }) {
-    if (!this.taxiMode) return 'EARN COINS VIA TAXI/RACE • OPEN SHOP FOR BIKE (400)';
+    if (!this.taxiMode) return 'EARN COINS VIA TAXI/RACE • OPEN SHOP - ALL VEHICLES FREE';
     if (this.taxiPassenger && this.taxiTarget) {
       const dist = Math.round(Math.hypot((playerPos.x || 0) - this.taxiTarget.x, (playerPos.z || 0) - this.taxiTarget.z));
       return `FARE TO MARKER (${dist}m)`;
+    }
+    if (this.taxiPickupPoint) {
+      const dist = Math.round(Math.hypot((playerPos.x || 0) - this.taxiPickupPoint.x, (playerPos.z || 0) - this.taxiPickupPoint.z));
+      return `PICK UP PASSENGER (${dist}m) - FOLLOW YELLOW ROUTE`;
     }
     const radius = (typeof TAXI !== 'undefined' && TAXI.pickupRadius) || 8;
     const peds = this.world && Array.isArray(this.world.pedPool) ? this.world.pedPool : [];
@@ -652,33 +745,48 @@ _toast(msg, ms = 1800) {
         const rem = Math.max(0, Math.ceil(this.world.raceTime ?? 0));
         missionEl.textContent = `RACE CP ${cpNum}/${cpTotal} • ${rem}s LEFT`;
       } else {
-        missionEl.textContent = 'EARN COINS VIA TAXI/RACE • OPEN SHOP FOR BIKE (400)';
+        missionEl.textContent = 'EARN COINS VIA TAXI/RACE • OPEN SHOP - ALL VEHICLES FREE';
       }
     }
   }
 
   _updateMinimap() {
-    if (!this.minimapCanvas || !this.minimapCtx) return;
+    if (!this.minimapCanvas || !this.minimapCtx || !this.world) return;
     const ctx = this.minimapCtx;
     const w = this.minimapCanvas.width;
     const h = this.minimapCanvas.height;
     const span = WORLD_CFG.gridSpan || 374;
-
-    ctx.clearRect(0, 0, w, h);
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
-    ctx.fillRect(0, 0, w, h);
-
     const toMapX = (wx) => ((wx + span * 0.5) / span) * w;
     const toMapY = (wz) => ((wz + span * 0.5) / span) * h;
     const roadPx = Math.max(2, (WORLD_CFG.roadWidth / span) * w);
+    const t = this.world.time || 0;
 
-    ctx.fillStyle = 'rgba(148, 163, 184, 0.45)';
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+    ctx.fillRect(0, 0, w, h);
+
+    ctx.fillStyle = 'rgba(148, 163, 184, 0.42)';
     const streets = this.world.streetCoords || [];
     for (let i = 0; i < streets.length; i++) {
       const sx = toMapX(streets[i]) - roadPx * 0.5;
       const sy = toMapY(streets[i]) - roadPx * 0.5;
       ctx.fillRect(sx, 0, roadPx, h);
       ctx.fillRect(0, sy, w, roadPx);
+    }
+
+    const stations = (this.world.fuelStations && this.world.fuelStations.length)
+      ? this.world.fuelStations
+      : (this.world.fuelStation ? [this.world.fuelStation] : []);
+    for (const st of stations) {
+      const fx = toMapX(st.x);
+      const fy = toMapY(st.z);
+      ctx.fillStyle = '#4ade80';
+      ctx.fillRect(fx - 3, fy - 3, 6, 6);
+      ctx.strokeStyle = 'rgba(74, 222, 128, 0.7)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(fx - 5, fy - 5, 10, 10);
+      ctx.font = 'bold 8px sans-serif';
+      ctx.fillText('F', fx - 2, fy - 7);
     }
 
     if (this.world.trafficPool) {
@@ -692,10 +800,63 @@ _toast(msg, ms = 1800) {
     const carPos = this.car.getPosition();
     const cx = toMapX(carPos.x);
     const cy = toMapY(carPos.z);
+
+    let obj = null;
+    let color = '#facc15';
+    let label = 'P';
+    if (this.taxiMode) {
+      if (this.taxiTarget) { obj = this.taxiTarget; color = '#4ade80'; label = 'D'; }
+      else if (this.taxiPickupPoint) { obj = this.taxiPickupPoint; color = '#facc15'; label = 'P'; }
+    } else if (this.world.raceActive && Array.isArray(this.world.raceCheckpoints)) {
+      const cp = this.world.raceCheckpoints[this.world.raceIndex || 0];
+      if (cp) { obj = cp; color = '#f472b6'; label = 'R'; }
+    }
+
+    if (obj) {
+      const ox = toMapX(obj.x || 0);
+      const oy = toMapY(obj.z || 0);
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2.5;
+      ctx.setLineDash([5, 4]);
+      ctx.lineDashOffset = -t * 14;
+      ctx.globalAlpha = 0.9;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(ox, cy);
+      ctx.lineTo(ox, oy);
+      ctx.stroke();
+      ctx.restore();
+
+      const pulse = 4 + Math.sin(t * 5) * 2;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.globalAlpha = 0.85;
+      ctx.beginPath();
+      ctx.arc(ox, oy, pulse, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(ox, oy, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.font = 'bold 9px sans-serif';
+      ctx.fillText(label, ox + 6, oy - 5);
+    }
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    const heading = typeof this.car.getHeading === 'function' ? this.car.getHeading() : 0;
+    ctx.rotate(-heading);
     ctx.fillStyle = '#38bdf8';
     ctx.beginPath();
-    ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+    ctx.moveTo(0, -6);
+    ctx.lineTo(4.5, 5);
+    ctx.lineTo(0, 2.5);
+    ctx.lineTo(-4.5, 5);
+    ctx.closePath();
     ctx.fill();
+    ctx.restore();
   }
 
   _loop(now) {
@@ -722,21 +883,46 @@ _toast(msg, ms = 1800) {
 
     if (this.state === 'play' && this.taxiMode && typeof TAXI !== 'undefined') {
       const pPos = this.car.getPosition();
-      if (!this.taxiPassenger && this.world && Array.isArray(this.world.pedPool)) {
-        for (let i = 0; i < this.world.pedPool.length; i++) {
-          const ped = this.world.pedPool[i];
-          if (!ped || !ped.root) continue;
-          const d = Math.hypot(pPos.x - ped.root.position.x, pPos.z - ped.root.position.z);
-          if (d <= (TAXI.pickupRadius || 8)) {
-            this.taxiPassenger = ped;
-            const streets = this.world.streetCoords || [0];
-            const tx = streets[Math.floor(Math.random() * streets.length)] || 0;
-            const tz = streets[Math.floor(Math.random() * streets.length)] || 0;
-            this.taxiPickupPos = { x: pPos.x, z: pPos.z };
-            this.taxiTarget = { x: tx, z: tz };
-            if (this.world) this.world.taxiTarget = this.taxiTarget;
-            break;
+
+      if (this.taxiFareMarker) {
+        this.taxiFareMarker.position.y = Math.sin((this.world ? this.world.time : 0) * 3) * 0.28;
+        this.taxiFareMarker.rotation.y += dt * 0.8;
+      }
+
+      if (!this.taxiPassenger && !this.taxiPickupPoint) {
+        if (typeof this._startFare === 'function') this._startFare();
+      } else if (!this.taxiPassenger && this.taxiPickupPoint) {
+        const d = Math.hypot(pPos.x - this.taxiPickupPoint.x, pPos.z - this.taxiPickupPoint.z);
+        if (d <= ((typeof TAXI !== 'undefined' && TAXI.pickupMarkerRadius) || 8)) {
+          let ped = null;
+          const peds = this.world && Array.isArray(this.world.pedPool) ? this.world.pedPool : [];
+          let bestD = Infinity;
+          for (let i = 0; i < peds.length; i++) {
+            const p = peds[i];
+            if (!p || !p.root || !p.root.position) continue;
+            const pd = Math.hypot(pPos.x - p.root.position.x, pPos.z - p.root.position.z);
+            if (pd < bestD) { bestD = pd; ped = p; }
           }
+          this.taxiPassenger = ped || { root: { position: { x: this.taxiPickupPoint.x, z: this.taxiPickupPoint.z } } };
+          const streets = this.world && Array.isArray(this.world.streetCoords) && this.world.streetCoords.length
+            ? this.world.streetCoords : [0];
+          let tx = pPos.x + 90;
+          let tz = pPos.z + 90;
+          let bestTrip = Infinity;
+          for (let k = 0; k < 30; k++) {
+            const cx = streets[Math.floor(Math.random() * streets.length)] || 0;
+            const cz = streets[Math.floor(Math.random() * streets.length)] || 0;
+            const d = Math.hypot(cx - pPos.x, cz - pPos.z);
+            if (d > 45 && d < 200) { tx = cx; tz = cz; break; }
+            if (Math.abs(d - 120) < bestTrip) { bestTrip = Math.abs(d - 120); tx = cx; tz = cz; }
+          }
+          this.taxiPickupPos = { x: this.taxiPickupPoint.x, z: this.taxiPickupPoint.z };
+          this.taxiTarget = { x: tx, z: tz };
+          if (this.world) this.world.taxiTarget = this.taxiTarget;
+          this.taxiPickupPoint = null;
+          this._clearFareMarker();
+          if (typeof this._toast === 'function') this._toast('PICKED UP - DRIVE TO GREEN MARKER', 1800);
+          this._updateHud();
         }
       } else if (this.taxiPassenger && this.taxiTarget) {
         const dDrop = Math.hypot(pPos.x - this.taxiTarget.x, pPos.z - this.taxiTarget.z);
@@ -748,9 +934,13 @@ _toast(msg, ms = 1800) {
           const fare = Math.round((TAXI.fareBase || 35) + tripDist * (TAXI.farePerMeter || 0.5));
           this.coins = (this.coins || 0) + fare;
           this.taxiEarnings = (this.taxiEarnings || 0) + fare;
-          this.taxiPassenger = null;
-          this.taxiTarget = null;
-          if (this.world) this.world.taxiTarget = null;
+          if (typeof this._endFare === 'function') this._endFare(fare);
+          else {
+            this.taxiPassenger = null;
+            this.taxiTarget = null;
+            if (this.world) this.world.taxiTarget = null;
+          }
+          this._updateHud();
         }
       }
     }
