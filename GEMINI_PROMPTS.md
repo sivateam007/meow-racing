@@ -229,32 +229,6 @@ replayable at reduced reward; coins/XP/missionsCompleted survive reload; zero co
 
 ---
 
-## Step 10 — Competitive car and bike racing
-
-> LABEL PATCH 1 — config.js — ADD-ONLY `RACE_MODES` (car and bike: aiCount 5, laps 2,
-> checkpoints 6, timeLimit, reward/xp, allowed vehicle keys) and append two `MISSION_LIST`
-> entries of `type:'race'` with `raceMode:'car'` and `'bike'` (minLevel 2 and 4).
->
-> LABEL PATCH 2 — game.js — ADD-ONLY `_raceCircuit()`, `_clearRaceRivals()`,
-> `_startCompetitiveRace(modeKey)`, `_updateCompetitiveRace(dt,carPos)`,
-> `_endCompetitiveRace(won)` and `_raceText()`. Build 6 checkpoints from `streetCoords`,
-> spawn 5 AI rivals via `world._createVehicleMesh`, steer them between checkpoints,
-> track player lap/checkpoint and live position, pay out on win.
->
-> LABEL PATCH 3 — game.js — in `_startMission()` branch on `def.type === 'race'`;
-> in `_updateMissions()` call `_completeMission()` when `raceSession.finished && won`.
-> In `_loop()` call `_updateCompetitiveRace()` while a race session is active.
->
-> LABEL PATCH 4 — index.html / css — ADD-ONLY `#race-hud` chip showing `P1/6 • LAP 1/2 • 139s`.
->
-> LABEL PATCH 5 — game.js — show/hide and update `#race-hud` in `_updateHud()`.
-
-**Acceptance:** both race jobs appear in the mission panel, each spawns 5 moving rivals,
-HUD shows live position/lap/timer, finishing first pays exactly the mission reward and
-increments `racesWon`; wrong vehicle class shows a clear toast instead of starting.
-
----
-
 ## Final validation checklist (run after every step)
 
 ```powershell

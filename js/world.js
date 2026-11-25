@@ -6,7 +6,6 @@ import {
   VEHICLE_TYPES,
   SURVIVAL,
   TERRAIN,
-  RACE,
   FUEL,
   TRAIN,
   COLORS,
@@ -1348,86 +1347,6 @@ _buildWindowTextures() {
 
 
 
-
-  _startStreetRace(playerPos = { x: 0, z: 0 }) {
-    if (!this.raceGroup) {
-      this.raceGroup = new THREE.Group();
-      this.scene.add(this.raceGroup);
-    }
-    this.raceGroup.clear();
-
-    const total = (typeof RACE !== 'undefined' && RACE.checkpoints) || 3;
-    const radius = (typeof RACE !== 'undefined' && RACE.radius) || 12;
-    this.raceCheckpoints = [];
-    this.raceIndex = 0;
-    this.raceTime = (typeof RACE !== 'undefined' && RACE.timeLimit) || 90;
-    this.raceActive = true;
-
-    const ringGeo = new THREE.TorusGeometry(radius * 0.55, 0.45, 10, 28);
-    const activeMat = new THREE.MeshBasicMaterial({ color: 0x00f5d4 });
-    const idleMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
-
-    const px = playerPos.x || 0;
-    const pz = playerPos.z || 0;
-    const limit = WORLD_CFG.halfSpan - 16;
-
-    for (let i = 0; i < total; i++) {
-      const angle = ((i + 1) / total) * Math.PI * 1.4 - Math.PI * 0.7;
-      const dist = 85 + i * 75;
-      const cx = clamp(px + Math.sin(angle) * dist, -limit, limit);
-      const cz = clamp(pz - Math.cos(angle) * dist, -limit, limit);
-
-      const mesh = new THREE.Mesh(ringGeo, i === 0 ? activeMat : idleMat);
-      mesh.position.set(cx, 5.2, cz);
-      mesh.visible = i === 0;
-      this.raceGroup.add(mesh);
-
-      this.raceCheckpoints.push({ x: cx, z: cz, mesh, activeMat, idleMat });
-    }
-  }
-
-  _updateStreetRace(dt, playerPos = { x: 0, z: 0 }) {
-    if (!this.raceActive || !Array.isArray(this.raceCheckpoints) || this.raceCheckpoints.length === 0) {
-      return 0;
-    }
-
-    const safeDt = Math.min(dt, 0.05);
-    this.raceTime = Math.max(0, (this.raceTime || 0) - safeDt);
-    if (this.raceTime <= 0) {
-      this.raceActive = false;
-      if (this.raceGroup) this.raceGroup.clear();
-      return 0;
-    }
-
-    const current = this.raceCheckpoints[this.raceIndex];
-    if (!current) {
-      this.raceActive = false;
-      return 0;
-    }
-
-    current.mesh.rotation.y += safeDt * 1.8;
-    const dist = Math.hypot((playerPos.x || 0) - current.x, (playerPos.z || 0) - current.z);
-    const hitRadius = (typeof RACE !== 'undefined' && RACE.radius) || 12;
-
-    if (dist <= hitRadius) {
-      current.mesh.visible = false;
-      this.raceIndex += 1;
-
-      if (this.raceIndex >= this.raceCheckpoints.length) {
-        this.raceActive = false;
-        if (this.raceGroup) this.raceGroup.clear();
-        return (typeof RACE !== 'undefined' && RACE.reward) || 400;
-      }
-
-      const nextCp = this.raceCheckpoints[this.raceIndex];
-      if (nextCp && nextCp.mesh) {
-        nextCp.mesh.visible = true;
-        nextCp.mesh.material = nextCp.activeMat;
-      }
-    }
-
-    return 0;
-  }
 
 _buildGreenDistricts() {
     if (!this.cityGroup || !Array.isArray(this.blockCenters)) return;

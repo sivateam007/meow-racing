@@ -1,6 +1,6 @@
 ﻿import * as THREE from 'three';
 import anime from 'animejs';
-import { WORLD_CFG, CAR_CFG, SPEED_LEVELS, COLORS, INPUT, SURVIVAL, FUEL, TRAIN, TAXI, SHOP, VEHICLE_TYPES, MISSION_LIST, LEVEL_TITLES, RACE_MODES, clamp } from './config.js';
+import { WORLD_CFG, CAR_CFG, SPEED_LEVELS, COLORS, INPUT, SURVIVAL, FUEL, TRAIN, TAXI, SHOP, VEHICLE_TYPES, MISSION_LIST, LEVEL_TITLES, clamp } from './config.js';
 import Car from './car.js';
 import World from './world.js';
 import Effects from './effects.js';
@@ -413,8 +413,6 @@ export class Game {
     this.level = profile.level || 1;
     this.faresCompleted = profile.faresCompleted || 0;
     this.activeMission = null;
-    this._clearRaceRivals();
-    this.raceSession = null;
     this.ownedVehicles = Array.isArray(profile.ownedVehicles) && profile.ownedVehicles.length
       ? profile.ownedVehicles.slice() : ['sedan'];
     this.currentVehicle = this.ownedVehicles.includes(profile.currentVehicle) ? profile.currentVehicle : 'sedan';
@@ -428,10 +426,6 @@ export class Game {
     this.health = SURVIVAL.maxHealth;
     this._lastCarPos = null;
     if (typeof FUEL !== 'undefined') this.fuel = FUEL.startAmount ?? FUEL.max ?? 100;
-    if (this.world) {
-      this.world.raceActive = false;
-      this.world.raceCheckpoints = [];
-    }
     if (this.menuOverlay) {
       this.menuOverlay.style.display = 'none';
       this.menuOverlay.classList.add('hidden');
@@ -706,7 +700,7 @@ _toast(msg, ms = 1800) {
   }
 
   _pickupHint(playerPos = { x: 0, z: 0 }) {
-    if (!this.taxiMode) return 'EARN COINS VIA TAXI/RACE • OPEN SHOP - ALL VEHICLES FREE';
+    if (!this.taxiMode) return 'EARN COINS VIA TAXI • JOBS • OPEN SHOP - ALL VEHICLES FREE';
     if (this.taxiPassenger && this.taxiTarget) {
       const dist = Math.round(Math.hypot((playerPos.x || 0) - this.taxiTarget.x, (playerPos.z || 0) - this.taxiTarget.z));
       return `FARE TO MARKER (${dist}m)`;
@@ -819,132 +813,6 @@ _clearMissionMarker() {
     panel.classList.remove('hidden');
   }
 
-  _raceCircuit(center, count) {
-    const streets = this.world && Array.isArray(this.world.streetCoords) && this.world.streetCoords.length
-      ? this.world.streetCoords : [0];
-    const pts = [];
-    let guard = 0;
-    while (pts.length < count && guard++ < 240) {
-      const x = streets[Math.floor(Math.random() * streets.length)] || 0;
-      const z = streets[Math.floor(Math.random() * streets.length)] || 0;
-      if (Math.hypot(x - (center.x || 0), z - (center.z || 0)) < 45) continue;
-      if (pts.some((p) => Math.hypot(p.x - x, p.z - z) < 55)) continue;
-      pts.push({ x, z });
-    }
-    while (pts.length < count) {
-      pts.push({ x: (center.x || 0) + 70 + pts.length * 25, z: (center.z || 0) + 60 });
-    }
-    return pts;
-  }
-
-  _clearRaceRivals() {
-    if (Array.isArray(this.raceRivals)) {
-      for (const r of this.raceRivals) {
-        if (r.mesh && r.mesh.parent) r.mesh.parent.remove(r.mesh);
-      }
-    }
-    this.raceRivals = [];
-  }
-
-  _startCompetitiveRace(modeKey) {
-    const mode = RACE_MODES && RACE_MODES[modeKey];
-    if (!mode || !this.world) return false;
-    if (!mode.allowed.includes(this.currentVehicle)) {
-      this._toast(modeKey === 'bike' ? 'SELECT A BIKE FOR THIS RACE' : 'SELECT A CAR FOR THIS RACE', 2200);
-      return false;
-    }
-    this._clearRaceRivals();
-    const p = this.car.getPosition();
-    const cps = this._raceCircuit(p, mode.checkpoints || 6);
-    const types = mode.allowed.filter((t) => !t.includes('truck'));
-    for (let i = 0; i < (mode.aiCount || 5); i++) {
-      let built = null;
-      try { built = this.world._createVehicleMesh(types[i % types.length], mode.colors[i % mode.colors.length]); } catch (_) {}
-      const mesh = built && (built.group || built);
-      if (!mesh) continue;
-      const a = (i / (mode.aiCount || 5)) * Math.PI * 2;
-      mesh.position.set(p.x + Math.cos(a) * 11, 0, p.z + Math.sin(a) * 11);
-      if (this.world.scene) this.world.scene.add(mesh);
-      this.raceRivals.push({ mesh, heading: 0, speed: 24, cp: 0, lap: 0 });
-    }
-    this.raceSession = {
-      mode: modeKey, cps, laps: mode.laps || 2, timeLeft: mode.timeLimit || 150,
-      playerCp: 0, playerLap: 0, position: 1, finished: false, won: false, elapsed: 0
-    };
-    this._toast('RACE STARTED - ' + mode.label, 2000);
-    return true;
-  }
-
-  _updateCompetitiveRace(dt, carPos) {
-    const s = this.raceSession;
-    if (!s || s.finished) return;
-    const safeDt = Math.min(dt, 0.05);
-    s.elapsed += safeDt;
-    s.timeLeft = Math.max(0, s.timeLeft - safeDt);
-    if (s.timeLeft <= 0) { this._endCompetitiveRace(false); return; }
-
-    for (const r of this.raceRivals) {
-      const t = s.cps[r.cp];
-      if (!t || !r.mesh) continue;
-      const pos = r.mesh.position;
-      const dx = t.x - pos.x;
-      const dz = t.z - pos.z;
-      if (Math.hypot(dx, dz) < 13) {
-        r.cp++;
-        if (r.cp >= s.cps.length) { r.cp = 0; r.lap++; }
-      }
-      const desired = Math.atan2(-dx, -dz);
-      let diff = desired - r.heading;
-      while (diff > Math.PI) diff -= Math.PI * 2;
-      while (diff < -Math.PI) diff += Math.PI * 2;
-      r.heading += diff * Math.min(1, safeDt * 3);
-      r.speed = 24 + Math.min(4, r.lap * 2);
-      pos.x -= Math.sin(r.heading) * r.speed * safeDt;
-      pos.z -= Math.cos(r.heading) * r.speed * safeDt;
-      r.mesh.rotation.y = r.heading;
-    }
-
-    const target = s.cps[s.playerCp];
-    if (target && Math.hypot(carPos.x - target.x, carPos.z - target.z) < 13) {
-      s.playerCp++;
-      if (s.playerCp >= s.cps.length) { s.playerCp = 0; s.playerLap++; }
-      if (s.playerLap >= s.laps) { this._endCompetitiveRace(true); return; }
-    }
-    const prog = s.playerLap * s.cps.length + s.playerCp;
-    let ahead = 0;
-    for (const r of this.raceRivals) {
-      if (r.lap * s.cps.length + r.cp > prog) ahead++;
-    }
-    s.position = ahead + 1;
-  }
-
-  _endCompetitiveRace(won) {
-    const s = this.raceSession;
-    if (!s || s.finished) return;
-    s.finished = true;
-    s.won = won;
-    this._clearRaceRivals();
-    if (won) {
-      const prof = CityStorage.get();
-      CityStorage.save({
-        racesWon: (prof.racesWon || 0) + 1,
-        bestTimeSec: prof.bestTimeSec ? Math.min(prof.bestTimeSec, s.elapsed) : s.elapsed
-      });
-      this._toast('RACE WON - P1!', 2200);
-      if (this.activeMission) this.activeMission.progress = this.activeMission.target;
-    } else {
-      this._toast('RACE OVER - TRY AGAIN', 2000);
-      if (this.activeMission) this.activeMission.failed = true;
-    }
-  }
-
-  _raceText() {
-    const s = this.raceSession;
-    if (!s || s.finished) return '';
-    const total = (this.raceRivals || []).length + 1;
-    return `P${s.position}/${total} • LAP ${Math.min(s.laps, s.playerLap + 1)}/${s.laps} • ${Math.ceil(s.timeLeft)}s`;
-  }
-
   _startMission(id) {
     this._clearMissionMarker();
     const missions = typeof MISSION_LIST !== 'undefined' ? MISSION_LIST : [];
@@ -954,13 +822,6 @@ _clearMissionMarker() {
     const prof = typeof CityStorage !== 'undefined' && CityStorage.get ? CityStorage.get() : (this.profile || {});
     const isReplay = Array.isArray(prof.missionsCompleted) && prof.missionsCompleted.includes(def.id);
     const pPos = this.car && typeof this.car.getPosition === 'function' ? this.car.getPosition() : { x: 0, z: 0 };
-
-    if (def.type === 'race') {
-      if (!this._startCompetitiveRace(def.raceMode)) return;
-      this.activeMission = { id: def.id, def, isReplay, progress: 0, target: 1, race: true };
-      this._updateHud();
-      return;
-    }
 
     const totalCheckpoints = def.type === 'sprint' ? (def.checkpointCount || 3) : 1;
     const pt = this._pickMissionStreetPoint(pPos, 65);
@@ -1007,17 +868,6 @@ _clearMissionMarker() {
     const px = carPos.x || 0;
     const pz = carPos.z || 0;
 
-    if (def.type === 'race') {
-      if (mState.failed) {
-        this.activeMission = null;
-        if (this.raceSession) this.raceSession.finished = true;
-      } else if (this.raceSession && this.raceSession.finished && this.raceSession.won) {
-        mState.progress = mState.target;
-        this._completeMission();
-      }
-      return;
-    }
-
     if (typeof mState.timeLeft === 'number') {
       mState.timeLeft = Math.max(0, mState.timeLeft - safeDt);
       if (mState.timeLeft <= 0) {
@@ -1054,7 +904,7 @@ _clearMissionMarker() {
         mState.marker.rotation.y += safeDt * 2.2;
       }
       const target = mState.checkpointTarget;
-      const radius = (typeof RACE !== 'undefined' && RACE.radius) || 12;
+      const radius = 12;
       if (target && Math.hypot(px - target.x, pz - target.z) <= radius) {
         mState.progress += 1;
         this._clearMissionMarker();
@@ -1118,9 +968,6 @@ _clearMissionMarker() {
     const tgt = Math.floor(mState.target || 1);
     const timerPart = typeof mState.timeLeft === 'number' ? ` • ${Math.ceil(mState.timeLeft)}s` : '';
 
-    if (def.type === 'race') {
-      return `RACE: ${this._raceText() || 'GET READY'}`;
-    }
     if (def.type === 'cruise') {
       return `JOB: ${def.name.toUpperCase()} (${cur}/${tgt}m)${timerPart}`;
     }
@@ -1144,17 +991,6 @@ _clearMissionMarker() {
       const idx = Math.min(SPEED_LEVELS.length - 1, Math.max(0, this.speedLevel || 0));
       speedBtn.textContent = `SPD ${idx + 1}`;
       speedBtn.setAttribute('aria-label', `Speed level ${idx + 1}: ${SPEED_LEVELS[idx].label}`);
-    }
-
-    const raceHud = document.getElementById('race-hud');
-    if (raceHud) {
-      const txt = typeof this._raceText === 'function' ? this._raceText() : '';
-      if (txt) {
-        raceHud.textContent = txt;
-        raceHud.classList.remove('hidden');
-      } else {
-        raceHud.classList.add('hidden');
-      }
     }
 
     const timeEl = document.getElementById('hud-time');
@@ -1235,13 +1071,8 @@ _clearMissionMarker() {
         }
       } else if (this.activeMission && typeof this._missionText === 'function') {
         missionEl.textContent = this._missionText();
-      } else if (this.world && this.world.raceActive) {
-        const cpTotal = (this.world.raceCheckpoints && this.world.raceCheckpoints.length) || 3;
-        const cpNum = Math.min((this.world.raceIndex ?? 0) + 1, cpTotal);
-        const rem = Math.max(0, Math.ceil(this.world.raceTime ?? 0));
-        missionEl.textContent = `RACE CP ${cpNum}/${cpTotal} • ${rem}s LEFT`;
       } else {
-        missionEl.textContent = 'EARN COINS VIA TAXI/RACE • OPEN SHOP - ALL VEHICLES FREE';
+        missionEl.textContent = 'EARN COINS VIA TAXI • JOBS • OPEN SHOP - ALL VEHICLES FREE';
       }
     }
   }
@@ -1299,9 +1130,6 @@ _clearMissionMarker() {
     if (this.taxiMode) {
       if (this.taxiTarget) { obj = this.taxiTarget; color = '#4ade80'; label = 'D'; }
       else if (this.taxiPickupPoint) { obj = this.taxiPickupPoint; color = '#facc15'; label = 'P'; }
-    } else if (this.world.raceActive && Array.isArray(this.world.raceCheckpoints)) {
-      const cp = this.world.raceCheckpoints[this.world.raceIndex || 0];
-      if (cp) { obj = cp; color = '#f472b6'; label = 'R'; }
     }
 
     if (obj) {
@@ -1413,9 +1241,6 @@ _clearMissionMarker() {
       if (typeof this._updateMissions === 'function') {
         this._updateMissions(dt, carPos);
       }
-      if (this.raceSession && !this.raceSession.finished && typeof this._updateCompetitiveRace === 'function') {
-        this._updateCompetitiveRace(dt, carPos);
-      }
     }
 
     if (this.state === 'play' && this.taxiMode && typeof TAXI !== 'undefined') {
@@ -1491,18 +1316,6 @@ _clearMissionMarker() {
         this.fuel = clamp(this.fuel + (FUEL.refillRate || 55) * dt, 0, maxFuel);
       } else if (Math.abs((this.car && this.car.speed) || 0) > 0.5) {
         this.fuel = clamp(this.fuel - (FUEL.drainPerSec || 0.35) * dt, 0, maxFuel);
-      }
-    }
-
-    const raceReward = this.world && typeof this.world._updateStreetRace === 'function'
-      ? this.world._updateStreetRace(dt, carPos)
-      : 0;
-    if (raceReward > 0) {
-      const prevCoins = this.coins || 0;
-      this.coins = prevCoins + raceReward;
-      this.displayedCoins = this.coins;
-      if (this.effects && typeof this.effects.tweenCounter === 'function' && this.coinsEl) {
-        this.effects.tweenCounter(this.coinsEl, prevCoins, this.coins, 450);
       }
     }
 
