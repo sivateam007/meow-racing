@@ -211,7 +211,45 @@ setVehicleType(typeKey) {
       if (c.front) this.frontPivots.push(pivot);
       else this.rearWheelPositions.push(new THREE.Vector3(c.x, 0.15, c.z));
     }
+
+    const roofY = wheelR + h;
+    const isBike = typeKey.includes('bike');
+    if (isBike) {
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(w * 1.05, 0.08, 0.1), this.trimMat || this.accentMat);
+      bar.position.set(0, wheelR + h * 0.82, l * 0.34);
+      this.chassis.add(bar);
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.32, 10, 8), this.accentMat);
+      head.position.set(0, roofY + 0.18, -0.1);
+      this.chassis.add(head);
+    }
+
+    if (['police', 'ambulance', 'fire_truck', 'swat_van'].includes(typeKey)) {
+      const red = new THREE.MeshBasicMaterial({ color: 0xef4444 });
+      const blue = new THREE.MeshBasicMaterial({ color: 0x3b82f6 });
+      for (const [sx, mat] of [[-w * 0.22, red], [w * 0.22, blue]]) {
+        const lamp = new THREE.Mesh(new THREE.BoxGeometry(w * 0.32, 0.22, 0.34), mat);
+        lamp.position.set(sx, roofY + 0.1, -0.05);
+        this.chassis.add(lamp);
+      }
+    }
+
+    if (['pickup', 'tow_truck', 'box_truck', 'cement_mixer', 'dump_truck'].includes(typeKey)) {
+      const cargo = new THREE.Mesh(
+        new THREE.BoxGeometry(w * 0.94, h * 0.9, l * 0.48),
+        new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.6, metalness: 0.25 })
+      );
+      cargo.position.set(0, wheelR + lowerH + h * 0.4, l * 0.22);
+      cargo.castShadow = true;
+      this.chassis.add(cargo);
+    }
+
+    if (['coupe', 'muscle', 'supercar', 'sports', 'roadster', 'rally_car', 'drift_car', 'grand_tourer'].includes(typeKey)) {
+      const spoiler = new THREE.Mesh(new THREE.BoxGeometry(w * 0.94, 0.14, 0.5), this.accentMat);
+      spoiler.position.set(0, roofY + 0.06, l * 0.4);
+      this.chassis.add(spoiler);
+    }
   }
+
   setSpeedLevel(index = 1) {
     const i = clamp(Math.round(index), 0, SPEED_LEVELS.length - 1);
     const level = SPEED_LEVELS[i];

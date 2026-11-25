@@ -701,7 +701,7 @@ _buildWindowTextures() {
     const hazardMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
     const lightMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
 
-    if (typeKey === 'bike') {
+    if (typeKey.includes('bike')) {
       const wr = 0.38;
       const wg = new THREE.CylinderGeometry(wr, wr, 0.22, 12);
       wg.rotateZ(Math.PI * 0.5);
@@ -770,7 +770,7 @@ _buildWindowTextures() {
       group.add(sign);
     }
 
-    if (typeKey === 'police') {
+    if (['police', 'ambulance', 'fire_truck', 'swat_van'].includes(typeKey)) {
       const redMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
       const blueMat = new THREE.MeshBasicMaterial({ color: 0x3b82f6 });
       const bar = new THREE.Mesh(new THREE.BoxGeometry(w * 0.72, 0.2, 0.32), darkMat);
@@ -782,6 +782,40 @@ _buildWindowTextures() {
       const bLamp = new THREE.Mesh(new THREE.BoxGeometry(w * 0.32, 0.22, 0.34), blueMat);
       bLamp.position.set(w * 0.18, wheelR + h + 0.09, -0.05);
       group.add(bLamp);
+    }
+
+    const isHeavy = ['pickup', 'tow_truck', 'box_truck', 'cement_mixer', 'dump_truck', 'oil_tanker'].includes(typeKey);
+    if (isHeavy) {
+      const cargo = new THREE.Mesh(
+        new THREE.BoxGeometry(w * 0.96, h * 0.95, l * 0.5),
+        new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.6, metalness: 0.25 })
+      );
+      cargo.position.set(0, wheelR + lowerH + h * 0.42, l * 0.22);
+      cargo.castShadow = true;
+      group.add(cargo);
+      const stripe = new THREE.Mesh(new THREE.BoxGeometry(w * 0.98, 0.18, l * 0.52), hazardMat);
+      stripe.position.set(0, wheelR + lowerH + h * 0.82, l * 0.22);
+      group.add(stripe);
+    }
+
+    const isSport = ['coupe', 'muscle', 'supercar', 'sports', 'roadster', 'rally_car', 'drift_car', 'grand_tourer'].includes(typeKey);
+    if (isSport) {
+      const spoiler = new THREE.Mesh(new THREE.BoxGeometry(w * 0.92, 0.14, 0.5), darkMat);
+      spoiler.position.set(0, wheelR + h + 0.08, l * 0.4);
+      group.add(spoiler);
+      for (const sx of [-w * 0.34, w * 0.34]) {
+        const mount = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.32, 0.12), darkMat);
+        mount.position.set(sx, wheelR + h - 0.06, l * 0.4);
+        group.add(mount);
+      }
+    }
+
+    if (typeKey === 'limousine') {
+      for (const wx of [-w * 0.26, 0, w * 0.26]) {
+        const win = new THREE.Mesh(new THREE.BoxGeometry(w * 0.2, 0.5, 0.1), lightMat);
+        win.position.set(wx, wheelR + h * 0.85, -l * 0.1);
+        group.add(win);
+      }
     }
 
     const wheelGeo = new THREE.CylinderGeometry(wheelR, wheelR, 0.32, 10);
@@ -1183,17 +1217,37 @@ _buildWindowTextures() {
     const dayBoost = this.time < cycle * 0.5 ? 0.35 : 0;
     const dayLight = Math.min(1, daylight + dayBoost);
 
+    const sunset = Math.max(0, 1 - Math.abs(dayLight - 0.36) / 0.28);
     const topCol = new THREE.Color(COLORS.skyNightTop).lerp(new THREE.Color(COLORS.skyDayTop), dayLight);
+    topCol.lerp(new THREE.Color(0xfb923c), sunset * 0.55);
     const fogCol = new THREE.Color(COLORS.fogNight).lerp(new THREE.Color(COLORS.fogDay), dayLight);
+    fogCol.lerp(new THREE.Color(0xfda4af), sunset * 0.4);
     const sunCol = new THREE.Color(COLORS.sunNight).lerp(new THREE.Color(COLORS.sunDay), dayLight);
+    sunCol.lerp(new THREE.Color(0xf97316), sunset * 0.6);
 
     this.scene.background = topCol;
     if (this.scene.fog) {
       this.scene.fog.color.copy(fogCol);
     }
+    if (this._skyUniforms) {
+      if (this._skyUniforms.topColor) this._skyUniforms.topColor.value.copy(topCol);
+      if (this._skyUniforms.bottomColor) this._skyUniforms.bottomColor.value.copy(fogCol);
+    }
+    if (this._sunDisc) {
+      const a = this.lightPhase * Math.PI * 2 - Math.PI * 0.5;
+      this._sunDisc.position.set(Math.cos(a) * 240, Math.sin(a) * 200, -140);
+      this._sunDisc.lookAt(0, 0, 0);
+      this._sunDisc.visible = dayLight > 0.06;
+      this._sunDisc.material.color.setHex(sunset > 0.35 ? 0xffb347 : 0xfffbeb);
+    }
+    if (this._moonDisc) {
+      this._moonDisc.position.set(-Math.cos(this.lightPhase * Math.PI * 2) * 240, 190, 140);
+      this._moonDisc.lookAt(0, 0, 0);
+      this._moonDisc.visible = dayLight < 0.45;
+    }
     if (this.sunLight) {
       this.sunLight.color.copy(sunCol);
-      this.sunLight.intensity = lerp(0.7, 2.1, dayLight);
+      this.sunLight.intensity = lerp(0.7, 2.1, dayLight) * (1 - sunset * 0.3);
     }
   }
 
@@ -1320,6 +1374,7 @@ _buildWindowTextures() {
       `
     });
 
+    this._skyUniforms = skyMat.uniforms;
     const dome = new THREE.Mesh(new THREE.SphereGeometry(390, 24, 16), skyMat);
     dome.renderOrder = -1;
     grp.add(dome);
@@ -1336,6 +1391,17 @@ _buildWindowTextures() {
     sunDisc.lookAt(0, 0, 0);
     sunDisc.renderOrder = -1;
     grp.add(sunDisc);
+    this._sunDisc = sunDisc;
+
+    const moonDisc = new THREE.Mesh(
+      new THREE.CircleGeometry(9, 20),
+      new THREE.MeshBasicMaterial({ color: 0xe2e8f0, fog: false, depthWrite: false })
+    );
+    moonDisc.position.set(-140, 180, -120);
+    moonDisc.lookAt(0, 0, 0);
+    moonDisc.renderOrder = -1;
+    grp.add(moonDisc);
+    this._moonDisc = moonDisc;
 
     const cCanvas = document.createElement('canvas');
     cCanvas.width = 128;
