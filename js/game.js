@@ -428,8 +428,9 @@ export class Game {
     this.health = SURVIVAL.maxHealth;
     this._lastCarPos = null;
     if (typeof FUEL !== 'undefined') this.fuel = FUEL.startAmount ?? FUEL.max ?? 100;
-    if (this.world && typeof this.world._startStreetRace === 'function') {
-      this.world._startStreetRace(this.car.getPosition());
+    if (this.world) {
+      this.world.raceActive = false;
+      this.world.raceCheckpoints = [];
     }
     if (this.menuOverlay) {
       this.menuOverlay.style.display = 'none';
