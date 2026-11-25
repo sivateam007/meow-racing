@@ -484,7 +484,7 @@ _applyLayoutPreset(preset = 'compact') {
     if (this.health <= 0) {
       this.health = SURVIVAL.maxHealth;
       this.wanted = 0;
-      this.car.reset(29, 29, 0);
+      this.car.reset(0, 0, 0);
     }
   }
 

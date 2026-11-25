@@ -24,7 +24,7 @@ export class Car {
     this._buildModel();
     this.setSkin(initialSkinId);
     this.scene.add(this.group);
-    this.reset(29, 29, 0);
+    this.reset(0, 0, 0);
   }
 
   _buildModel() {
@@ -207,8 +207,6 @@ setVehicleType(typeKey) {
       else this.rearWheelPositions.push(new THREE.Vector3(c.x, 0.15, c.z));
     }
   }
-// Note: Add VEHICLE_TYPES to the import from './config.js' in car.js.
-
   reset(x = 0, z = 0, heading = 0) {
     this.speed = 0;
     this.lateralSpeed = 0;
