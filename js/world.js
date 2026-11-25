@@ -146,17 +146,26 @@ _buildWindowTextures() {
     }
 
     const groundMat = new THREE.MeshStandardMaterial({
-      color: COLORS.asphalt,
-      roughness: 0.88,
-      metalness: 0.06
+      color: 0x4b7a3f,
+      roughness: 0.94,
+      metalness: 0.02
     });
     const groundMesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(WORLD_CFG.gridSpan + 260, WORLD_CFG.gridSpan + 260),
+      new THREE.PlaneGeometry(20000, 20000),
       groundMat
     );
     groundMesh.rotation.x = -Math.PI * 0.5;
     groundMesh.receiveShadow = true;
     this.cityGroup.add(groundMesh);
+
+    const cityPad = new THREE.Mesh(
+      new THREE.PlaneGeometry(WORLD_CFG.gridSpan + 40, WORLD_CFG.gridSpan + 40),
+      new THREE.MeshStandardMaterial({ color: COLORS.asphalt, roughness: 0.88, metalness: 0.06 })
+    );
+    cityPad.rotation.x = -Math.PI * 0.5;
+    cityPad.position.y = 0.008;
+    cityPad.receiveShadow = true;
+    this.cityGroup.add(cityPad);
 
     const stripeMat = new THREE.MeshBasicMaterial({ color: COLORS.laneLine });
     const edgeMat = new THREE.MeshBasicMaterial({ color: COLORS.roadEdge });
@@ -343,7 +352,99 @@ _buildWindowTextures() {
     this._addStreetDetails();
     this._buildRoadDetails();
     this._buildSkyDome();
+    this._buildOpenWorld();
     this._clearRoadColliders();
+  }
+
+  _buildOpenWorld() {
+    if (!this.scene) return;
+    if (this.openWorldGroup) this.scene.remove(this.openWorldGroup);
+
+    const group = new THREE.Group();
+    this.openWorldGroup = group;
+    this.openWorldProps = [];
+
+    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5c3a21, roughness: 0.9 });
+    const pineMat = new THREE.MeshStandardMaterial({ color: 0x166534, roughness: 0.85 });
+    const bushMat = new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.9 });
+    const rockMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.95 });
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0xd6d3d1, roughness: 0.8 });
+    const roofMat = new THREE.MeshStandardMaterial({ color: 0x7f1d1d, roughness: 0.8 });
+
+    const trunkGeo = new THREE.CylinderGeometry(0.35, 0.55, 3.2, 6);
+    const pineGeo = new THREE.ConeGeometry(2.1, 5.4, 7);
+    const bushGeo = new THREE.IcosahedronGeometry(1.3, 0);
+    const rockGeo = new THREE.DodecahedronGeometry(1.5, 0);
+    const wallGeo = new THREE.BoxGeometry(6, 3.4, 5.4);
+    const roofGeo = new THREE.ConeGeometry(4.6, 2.4, 4);
+
+    const count = 150;
+    for (let i = 0; i < count; i++) {
+      const prop = new THREE.Group();
+      const kind = i % 4;
+
+      if (kind === 0) {
+        const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+        trunk.position.y = 1.6;
+        const crown = new THREE.Mesh(pineGeo, pineMat);
+        crown.position.y = 5.2;
+        prop.add(trunk, crown);
+      } else if (kind === 1) {
+        const rock = new THREE.Mesh(rockGeo, rockMat);
+        rock.position.y = 1;
+        rock.rotation.set(randRange(0, 1), randRange(0, 3), randRange(0, 1));
+        prop.add(rock);
+      } else if (kind === 2) {
+        const bush = new THREE.Mesh(bushGeo, bushMat);
+        bush.position.y = 0.9;
+        prop.add(bush);
+      } else {
+        const wall = new THREE.Mesh(wallGeo, wallMat);
+        wall.position.y = 1.7;
+        const roof = new THREE.Mesh(roofGeo, roofMat);
+        roof.position.y = 4.5;
+        roof.rotation.y = Math.PI * 0.25;
+        prop.add(wall, roof);
+      }
+
+      group.add(prop);
+      const entry = { group: prop, kind };
+      this.openWorldProps.push(entry);
+      this._placeOpenProp(entry, 0, 0, 150, 520);
+    }
+    this.scene.add(group);
+  }
+
+  _placeOpenProp(prop, cx, cz, minR, maxR) {
+    const clear = (WORLD_CFG.halfSpan || 300) + 70;
+    for (let i = 0; i < 24; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const r = randRange(minR, maxR);
+      const x = cx + Math.cos(a) * r;
+      const z = cz + Math.sin(a) * r;
+      if (Math.abs(x) < clear && Math.abs(z) < clear) continue;
+      prop.group.position.set(x, 0, z);
+      prop.group.rotation.y = Math.random() * Math.PI * 2;
+      const s = randRange(0.7, 1.7);
+      prop.group.scale.setScalar(s);
+      return;
+    }
+    prop.group.position.set(cx + maxR, 0, cz + maxR);
+  }
+
+  _updateOpenWorld(playerPos = { x: 0, z: 0 }) {
+    if (!Array.isArray(this.openWorldProps)) return;
+    const px = playerPos.x || 0;
+    const pz = playerPos.z || 0;
+    for (const prop of this.openWorldProps) {
+      const p = prop.group.position;
+      if (Math.hypot(p.x - px, p.z - pz) > 520) {
+        this._placeOpenProp(prop, px, pz, 150, 480);
+      }
+    }
+    if (this._skyDomeGroup) {
+      this._skyDomeGroup.position.set(px, 0, pz);
+    }
   }
 
   _clearRoadColliders() {
@@ -941,6 +1042,7 @@ _buildWindowTextures() {
     this._updateFuelStation(safeDt, playerPos);
     this._updateTrain(safeDt);
     this._updateTaxiMarker(safeDt);
+    this._updateOpenWorld(playerPos);
   }
 
   _buildRoadDetails() {

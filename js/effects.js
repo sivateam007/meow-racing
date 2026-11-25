@@ -184,7 +184,7 @@ setDayNight(t = 0) {
       if (this.scene.fog) {
         this.scene.fog.color.copy(fogCol);
         if (typeof this.scene.fog.density === 'number') {
-          this.scene.fog.density = lerp(0.0044, 0.0032, daylight);
+          this.scene.fog.density = lerp(0.0026, 0.0018, daylight);
         }
       }
       this.scene.traverse((obj) => {

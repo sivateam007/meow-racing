@@ -467,22 +467,6 @@ export class Game {
     const pos = this.car.getPosition();
     const radius = CAR_CFG.collisionRadius || 2.1;
 
-    const boundLimit = WORLD_CFG.halfSpan - 1.5;
-    if (pos.x < -boundLimit) {
-      pos.x = -boundLimit;
-      this.car.collide(1, 0, 0.8);
-    } else if (pos.x > boundLimit) {
-      pos.x = boundLimit;
-      this.car.collide(-1, 0, 0.8);
-    }
-    if (pos.z < -boundLimit) {
-      pos.z = -boundLimit;
-      this.car.collide(0, 1, 0.8);
-    } else if (pos.z > boundLimit) {
-      pos.z = boundLimit;
-      this.car.collide(0, -1, 0.8);
-    }
-
     const colliders = this.world.getColliders ? this.world.getColliders() : [];
     for (let i = 0; i < colliders.length; i++) {
       const box = colliders[i];

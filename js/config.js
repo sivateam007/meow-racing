@@ -36,7 +36,7 @@ export const WORLD_CFG = {
   skylineCount: 48,
   skylineRadiusMin: 185,
   skylineRadiusMax: 330,
-  fogDensity: 0.0032,
+  fogDensity: 0.0018,
   dayCycleDurationSec: 180,
   lightCycleDurationSec: 16,
   redLightRatio: 0.45,
