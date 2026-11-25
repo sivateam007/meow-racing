@@ -1,6 +1,6 @@
 ﻿import * as THREE from 'three';
 import anime from 'animejs';
-import { WORLD_CFG, CAR_CFG, SPEED_LEVELS, COLORS, INPUT, SURVIVAL, FUEL, TRAIN, TAXI, SHOP, clamp } from './config.js';
+import { WORLD_CFG, CAR_CFG, SPEED_LEVELS, COLORS, INPUT, SURVIVAL, FUEL, TRAIN, TAXI, SHOP, VEHICLE_TYPES, MISSION_LIST, LEVEL_TITLES, clamp } from './config.js';
 import Car from './car.js';
 import World from './world.js';
 import Effects from './effects.js';
@@ -28,6 +28,8 @@ export class Game {
     this.currentVehicle = this.profile.currentVehicle || 'sedan';
     this.controlLayout = this.profile.layout || 'compact';
     this.speedLevel = this.profile.speedLevel ?? 1;
+    this.faresCompleted = this.profile.faresCompleted || 0;
+    this.activeMission = null;
     this.health = SURVIVAL.maxHealth;
     this._lastCrashTime = -999;
     this._lastCarPos = null;
@@ -214,7 +216,7 @@ export class Game {
       btn.addEventListener('click', () => {
         const vType = btn.getAttribute('data-vehicle');
         if (!vType) return;
-        const freeTypes = ['bike', 'coupe', 'muscle', 'supercar', 'bus', 'sedan', 'taxi', 'police'];
+        const freeTypes = typeof VEHICLE_TYPES !== 'undefined' ? Object.keys(VEHICLE_TYPES) : [];
         if (!freeTypes.includes(vType)) return;
         if (!this.ownedVehicles) this.ownedVehicles = ['sedan'];
         let unlocked = false;
@@ -235,6 +237,37 @@ export class Game {
         this._updateHud();
       });
     });
+
+    document.querySelectorAll('#shop-panel-vehicles [data-category]').forEach((tabBtn) => {
+      tabBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const cat = tabBtn.getAttribute('data-category') || 'all';
+        document.querySelectorAll('#shop-panel-vehicles [data-category]').forEach((b) => {
+          b.classList.toggle('active', b === tabBtn);
+        });
+        document.querySelectorAll('#shop-panel-vehicles [data-vehicle]').forEach((vBtn) => {
+          const vCat = vBtn.getAttribute('data-category') || '';
+          const show = cat === 'all' || vCat === cat;
+          vBtn.style.display = show ? '' : 'none';
+        });
+      });
+    });
+
+    const missionBtn = document.getElementById('touch-missions');
+    if (missionBtn) {
+      missionBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (typeof this._openMissions === 'function') this._openMissions();
+      });
+    }
+    const missionCloseBtn = document.getElementById('mission-close-button');
+    if (missionCloseBtn) {
+      missionCloseBtn.addEventListener('click', () => {
+        const panel = document.getElementById('mission-panel');
+        if (panel) panel.classList.add('hidden');
+      });
+    }
 
     const helpBtn = document.getElementById('help-button');
     if (helpBtn) {
@@ -374,6 +407,8 @@ export class Game {
     const profile = CityStorage.get();
     this.coins = profile.coins || 0;
     this.level = profile.level || 1;
+    this.faresCompleted = profile.faresCompleted || 0;
+    this.activeMission = null;
     this.ownedVehicles = Array.isArray(profile.ownedVehicles) && profile.ownedVehicles.length
       ? profile.ownedVehicles.slice() : ['sedan'];
     this.currentVehicle = this.ownedVehicles.includes(profile.currentVehicle) ? profile.currentVehicle : 'sedan';
@@ -670,6 +705,7 @@ _toast(msg, ms = 1800) {
       const p = CityStorage.addFare(farePaid);
       this.coins = p.coins;
       this.level = p.level;
+      this.faresCompleted = p.faresCompleted;
       if (typeof this._toast === 'function') {
         this._toast(`FARE PAID $${Math.round(farePaid)} • LV ${p.level}`, 2000);
       }
@@ -699,6 +735,261 @@ _toast(msg, ms = 1800) {
       }
     }
     return 'DRIVE NEAR A PEDESTRIAN TO PICK UP';
+  }
+
+_clearMissionMarker() {
+    if (this.activeMission && this.activeMission.marker && this.world && this.world.scene) {
+      this.world.scene.remove(this.activeMission.marker);
+      this.activeMission.marker = null;
+    }
+  }
+
+  _createMissionRing(x, z, colorHex = 0x22d3ee) {
+    if (!this.world || !this.world.scene || typeof THREE === 'undefined') return null;
+    const mesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(5.5, 5.5, 2.2, 22, 1, true),
+      new THREE.MeshBasicMaterial({
+        color: colorHex,
+        transparent: true,
+        opacity: 0.42,
+        side: THREE.DoubleSide,
+        depthWrite: false
+      })
+    );
+    mesh.position.set(x, 1.1, z);
+    this.world.scene.add(mesh);
+    return mesh;
+  }
+
+  _pickMissionStreetPoint(playerPos, minDist = 60) {
+    const streets = this.world && Array.isArray(this.world.streetCoords) && this.world.streetCoords.length > 0
+      ? this.world.streetCoords
+      : [0];
+    const px = (playerPos && playerPos.x) || 0;
+    const pz = (playerPos && playerPos.z) || 0;
+    let best = {
+      x: streets[Math.floor(Math.random() * streets.length)] || 0,
+      z: streets[Math.floor(Math.random() * streets.length)] || 0
+    };
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const cx = streets[Math.floor(Math.random() * streets.length)] || 0;
+      const cz = streets[Math.floor(Math.random() * streets.length)] || 0;
+      best = { x: cx, z: cz };
+      if (Math.hypot(cx - px, cz - pz) >= minDist) break;
+    }
+    return best;
+  }
+
+  _openMissions() {
+    const panel = document.getElementById('mission-panel');
+    const listEl = document.getElementById('mission-list');
+    const lvlEl = document.getElementById('mission-level');
+    if (!panel || !listEl) return;
+
+    const prof = typeof CityStorage !== 'undefined' && CityStorage.get ? CityStorage.get() : (this.profile || {});
+    const curLevel = prof.level || this.level || 1;
+    const completedIds = Array.isArray(prof.missionsCompleted) ? prof.missionsCompleted : [];
+    const titles = typeof LEVEL_TITLES !== 'undefined' ? LEVEL_TITLES : [];
+    const title = titles[Math.min(titles.length - 1, Math.max(0, curLevel - 1))] || 'Driver';
+
+    if (lvlEl) {
+      lvlEl.textContent = `LEVEL ${curLevel} — ${title.toUpperCase()}`;
+    }
+
+    const missions = typeof MISSION_LIST !== 'undefined' ? MISSION_LIST : [];
+    listEl.innerHTML = '';
+
+    for (let i = 0; i < missions.length; i++) {
+      const m = missions[i];
+      const unlocked = curLevel >= (m.minLevel || 1);
+      const isDone = completedIds.includes(m.id);
+      const payout = isDone ? Math.max(40, Math.round((m.reward || 100) * 0.45)) : (m.reward || 100);
+
+      const row = document.createElement('div');
+      row.className = `mission-item${unlocked ? '' : ' locked'}`;
+
+      const info = document.createElement('div');
+      info.innerHTML = `<strong>${m.name}</strong> <small>(LV ${m.minLevel || 1})</small><div>${m.description} +${payout} / +${m.xp || 50}XP</div>`;
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.disabled = !unlocked;
+      btn.textContent = !unlocked ? `LV ${m.minLevel}` : (isDone ? 'REPLAY' : 'START');
+      btn.addEventListener('click', () => {
+        this._startMission(m.id);
+        panel.classList.add('hidden');
+      });
+
+      row.appendChild(info);
+      row.appendChild(btn);
+      listEl.appendChild(row);
+    }
+
+    panel.classList.remove('hidden');
+  }
+
+  _startMission(id) {
+    this._clearMissionMarker();
+    const missions = typeof MISSION_LIST !== 'undefined' ? MISSION_LIST : [];
+    const def = missions.find((m) => m.id === id);
+    if (!def) return;
+
+    const prof = typeof CityStorage !== 'undefined' && CityStorage.get ? CityStorage.get() : (this.profile || {});
+    const isReplay = Array.isArray(prof.missionsCompleted) && prof.missionsCompleted.includes(def.id);
+    const pPos = this.car && typeof this.car.getPosition === 'function' ? this.car.getPosition() : { x: 0, z: 0 };
+
+    const totalCheckpoints = def.type === 'sprint' ? (def.checkpointCount || 3) : 1;
+    const pt = this._pickMissionStreetPoint(pPos, 65);
+    const marker = (def.type === 'delivery' || def.type === 'sprint')
+      ? this._createMissionRing(pt.x, pt.z, def.type === 'sprint' ? 0x00f5d4 : 0xfacc15)
+      : null;
+
+    this.activeMission = {
+      id: def.id,
+      def,
+      isReplay,
+      progress: 0,
+      target: def.type === 'cruise'
+        ? (def.target || 300)
+        : def.type === 'taxi'
+          ? (def.fareCount || 1)
+          : def.type === 'survive'
+            ? (def.timeLimit || 45)
+            : totalCheckpoints,
+      timeLeft: def.timeLimit || null,
+      lastPos: { x: pPos.x || 0, z: pPos.z || 0 },
+      lastFares: this.taxiEarnings || 0,
+      lastFareCount: typeof this.faresCompleted === 'number' ? this.faresCompleted : (prof.faresCompleted || 0),
+      checkpointIdx: 0,
+      checkpointTarget: pt,
+      marker
+    };
+
+    if (typeof CityStorage !== 'undefined' && CityStorage.save) {
+      CityStorage.save({ activeMission: def.id });
+    }
+    if (typeof this._toast === 'function') {
+      this._toast(`MISSION STARTED: ${def.name.toUpperCase()}`, 1800);
+    }
+  }
+
+  _updateMissions(dt, carPos = { x: 0, z: 0 }) {
+    const mState = this.activeMission;
+    if (!mState || !mState.def) return;
+    if (this.state !== 'play' || this.paused) return;
+
+    const safeDt = Math.min(dt, 0.05);
+    const def = mState.def;
+    const px = carPos.x || 0;
+    const pz = carPos.z || 0;
+
+    if (typeof mState.timeLeft === 'number') {
+      mState.timeLeft = Math.max(0, mState.timeLeft - safeDt);
+      if (mState.timeLeft <= 0) {
+        this._clearMissionMarker();
+        this.activeMission = null;
+        if (typeof this._toast === 'function') {
+          this._toast('MISSION FAILED - TIME UP', 1800);
+        }
+        return;
+      }
+    }
+
+    if (def.type === 'cruise') {
+      const last = mState.lastPos || { x: px, z: pz };
+      mState.progress += Math.hypot(px - last.x, pz - last.z);
+      mState.lastPos = { x: px, z: pz };
+    } else if (def.type === 'taxi') {
+      const curFares = typeof this.faresCompleted === 'number'
+        ? this.faresCompleted
+        : ((this.taxiEarnings || 0) > (mState.lastFares || 0) ? (mState.lastFareCount || 0) + 1 : (mState.lastFareCount || 0));
+      if (curFares > (mState.lastFareCount || 0)) {
+        mState.progress += curFares - (mState.lastFareCount || 0);
+        mState.lastFareCount = curFares;
+        mState.lastFares = this.taxiEarnings || 0;
+      }
+    } else if (def.type === 'survive') {
+      if (typeof this._lastCrashTime === 'number' && (this.elapsedTime || 0) - this._lastCrashTime < 0.25) {
+        mState.progress = 0;
+      } else {
+        mState.progress += safeDt;
+      }
+    } else if (def.type === 'delivery' || def.type === 'sprint') {
+      if (mState.marker) {
+        mState.marker.rotation.y += safeDt * 2.2;
+      }
+      const target = mState.checkpointTarget;
+      const radius = (typeof RACE !== 'undefined' && RACE.radius) || 12;
+      if (target && Math.hypot(px - target.x, pz - target.z) <= radius) {
+        mState.progress += 1;
+        this._clearMissionMarker();
+        if (mState.progress < mState.target) {
+          const nextPt = this._pickMissionStreetPoint({ x: px, z: pz }, 70);
+          mState.checkpointTarget = nextPt;
+          mState.marker = this._createMissionRing(nextPt.x, nextPt.z, 0x00f5d4);
+        }
+      }
+    }
+
+    if (mState.progress >= mState.target) {
+      this._completeMission();
+    }
+  }
+
+  _completeMission() {
+    const mState = this.activeMission;
+    if (!mState || !mState.def) return;
+
+    const def = mState.def;
+    const reward = mState.isReplay ? Math.max(40, Math.round((def.reward || 100) * 0.45)) : (def.reward || 100);
+    const xpGain = mState.isReplay ? Math.max(15, Math.round((def.xp || 50) * 0.5)) : (def.xp || 50);
+
+    this._clearMissionMarker();
+
+    if (typeof CityStorage !== 'undefined') {
+      if (typeof CityStorage.addCoins === 'function') {
+        CityStorage.addCoins(reward);
+      }
+      if (typeof CityStorage.addXp === 'function') {
+        const updated = CityStorage.addXp(xpGain);
+        if (updated && typeof updated.level === 'number') {
+          this.level = updated.level;
+        }
+      }
+      const prof = CityStorage.get ? CityStorage.get() : {};
+      const doneList = Array.isArray(prof.missionsCompleted) ? prof.missionsCompleted.slice() : [];
+      if (!doneList.includes(def.id)) {
+        doneList.push(def.id);
+      }
+      if (typeof CityStorage.save === 'function') {
+        CityStorage.save({ missionsCompleted: doneList, activeMission: null });
+      }
+      this.coins = typeof prof.coins === 'number' ? prof.coins : (this.coins || 0);
+    } else {
+      this.coins = (this.coins || 0) + reward;
+    }
+
+    this.activeMission = null;
+    if (typeof this._toast === 'function') {
+      this._toast(`MISSION COMPLETE +${reward} • +${xpGain}XP`, 2200);
+    }
+  }
+
+  _missionText() {
+    const mState = this.activeMission;
+    if (!mState || !mState.def) return '';
+    const def = mState.def;
+    const cur = Math.min(mState.target, Math.floor(mState.progress || 0));
+    const tgt = Math.floor(mState.target || 1);
+    const timerPart = typeof mState.timeLeft === 'number' ? ` • ${Math.ceil(mState.timeLeft)}s` : '';
+
+    if (def.type === 'cruise') {
+      return `JOB: ${def.name.toUpperCase()} (${cur}/${tgt}m)${timerPart}`;
+    }
+    if (def.type === 'survive') {
+      return `JOB: ${def.name.toUpperCase()} (${cur}/${tgt}s)${timerPart}`;
+    }
+    return `JOB: ${def.name.toUpperCase()} (${cur}/${tgt})${timerPart}`;
   }
 
   _updateHud() {
@@ -793,6 +1084,8 @@ _toast(msg, ms = 1800) {
         } else {
           missionEl.textContent = 'DRIVE NEAR A PEDESTRIAN TO PICK UP';
         }
+      } else if (this.activeMission && typeof this._missionText === 'function') {
+        missionEl.textContent = this._missionText();
       } else if (this.world && this.world.raceActive) {
         const cpTotal = (this.world.raceCheckpoints && this.world.raceCheckpoints.length) || 3;
         const cpNum = Math.min((this.world.raceIndex ?? 0) + 1, cpTotal);
@@ -967,6 +1260,9 @@ _toast(msg, ms = 1800) {
         const p = CityStorage.addDistance(this._distanceAccum);
         this.level = p.level;
         this._distanceAccum = 0;
+      }
+      if (typeof this._updateMissions === 'function') {
+        this._updateMissions(dt, carPos);
       }
     }
 

@@ -25,14 +25,48 @@
     </div>
   </div>
 
-  <div id="shop-panel-vehicles" class="shop-panel-vehicles hidden">
-    <div class="shop-panel-header">CITY MOTORS SHOP <span style="font-size:10px;opacity:.7">[B to close]</span></div>
-    <button type="button" data-vehicle="bike">BIKE - FREE</button>
-    <button type="button" data-vehicle="coupe">COUPE - FREE</button>
-    <button type="button" data-vehicle="muscle">MUSCLE - FREE</button>
-    <button type="button" data-vehicle="supercar">SUPERCAR - FREE</button>
-    <button type="button" data-vehicle="bus">BUS - FREE</button>
+<div id="shop-panel-vehicles" class="shop-panel-vehicles hidden">
+  <div class="shop-panel-header">
+    <span>CITY MOTORS SHOP</span>
   </div>
+  <div class="shop-tabs">
+    <button type="button" class="shop-tab active" data-category="all">ALL</button>
+    <button type="button" class="shop-tab" data-category="everyday">EVERYDAY</button>
+    <button type="button" class="shop-tab" data-category="sports">SPORTS</button>
+    <button type="button" class="shop-tab" data-category="luxury">LUXURY</button>
+    <button type="button" class="shop-tab" data-category="utility">UTILITY</button>
+    <button type="button" class="shop-tab" data-category="emergency">EMERGENCY</button>
+    <button type="button" class="shop-tab" data-category="heavy">HEAVY</button>
+    <button type="button" class="shop-tab" data-category="bikes">BIKES</button>
+  </div>
+  <div class="shop-vehicle-rows">
+    <button type="button" data-vehicle="hatchback" data-category="everyday">HATCHBACK - FREE</button>
+    <button type="button" data-vehicle="wagon" data-category="everyday">WAGON - FREE</button>
+    <button type="button" data-vehicle="minivan" data-category="everyday">MINIVAN - FREE</button>
+    <button type="button" data-vehicle="bus" data-category="everyday">BUS - FREE</button>
+    <button type="button" data-vehicle="coupe" data-category="sports">COUPE - FREE</button>
+    <button type="button" data-vehicle="muscle" data-category="sports">MUSCLE - FREE</button>
+    <button type="button" data-vehicle="supercar" data-category="sports">SUPERCAR - FREE</button>
+    <button type="button" data-vehicle="roadster" data-category="sports">ROADSTER - FREE</button>
+    <button type="button" data-vehicle="rally_car" data-category="sports">RALLY CAR - FREE</button>
+    <button type="button" data-vehicle="drift_car" data-category="sports">DRIFT CAR - FREE</button>
+    <button type="button" data-vehicle="limousine" data-category="luxury">LIMOUSINE - FREE</button>
+    <button type="button" data-vehicle="grand_tourer" data-category="luxury">GRAND TOURER - FREE</button>
+    <button type="button" data-vehicle="suv_luxury" data-category="luxury">LUXURY SUV - FREE</button>
+    <button type="button" data-vehicle="pickup" data-category="utility">PICKUP - FREE</button>
+    <button type="button" data-vehicle="tow_truck" data-category="utility">TOW TRUCK - FREE</button>
+    <button type="button" data-vehicle="box_truck" data-category="utility">BOX TRUCK - FREE</button>
+    <button type="button" data-vehicle="ambulance" data-category="emergency">AMBULANCE - FREE</button>
+    <button type="button" data-vehicle="fire_truck" data-category="emergency">FIRE TRUCK - FREE</button>
+    <button type="button" data-vehicle="swat_van" data-category="emergency">SWAT VAN - FREE</button>
+    <button type="button" data-vehicle="cement_mixer" data-category="heavy">CEMENT MIXER - FREE</button>
+    <button type="button" data-vehicle="dump_truck" data-category="heavy">DUMP TRUCK - FREE</button>
+    <button type="button" data-vehicle="bike" data-category="bikes">BIKE - FREE</button>
+    <button type="button" data-vehicle="cruiser_bike" data-category="bikes">CRUISER BIKE - FREE</button>
+    <button type="button" data-vehicle="dirt_bike" data-category="bikes">DIRT BIKE - FREE</button>
+    <button type="button" data-vehicle="sport_bike" data-category="bikes">SPORT BIKE - FREE</button>
+  </div>
+</div>
 
 <div class="hud">
     <div class="hud-top-left">
@@ -52,6 +86,7 @@
       <div class="hud-action-row">
         <button id="touch-taxi" class="touch-btn touch-action-btn" type="button" aria-label="Taxi Mode">TAXI</button>
         <button id="touch-shop" class="touch-btn touch-action-btn" type="button" aria-label="Vehicle Shop">SHOP</button>
+<button id="touch-missions" class="touch-btn touch-action-btn" type="button" aria-label="Missions">JOB</button>
       </div>
     </div>
 
@@ -164,6 +199,17 @@
   </div>
 
   <div id="toast"></div>
+
+<div id="mission-panel" class="overlay hidden">
+  <div class="overlay-card mission-card">
+    <h2 class="pause-title">MISSIONS</h2>
+    <div id="mission-level" class="mission-level-label">LEVEL 1</div>
+    <div id="mission-list" class="mission-list"></div>
+    <div class="overlay-actions">
+      <button id="mission-close-button" type="button" class="secondary-button">CLOSE</button>
+    </div>
+  </div>
+</div>
 
   <script type="module">
     import { Game } from './js/game.js';

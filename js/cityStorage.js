@@ -12,6 +12,8 @@ const DEFAULT_PROFILE = {
   currentVehicle: 'sedan',
   layout: 'compact',
   speedLevel: 1,
+  missionsCompleted: [],
+  activeMission: null,
   xp: 0,
   level: 1,
   totalDistance: 0,
@@ -71,6 +73,9 @@ function sanitize(raw) {
   }
   if (['compact', 'large', 'left', 'right'].includes(raw.layout)) p.layout = raw.layout;
   p.speedLevel = Math.min(2, Math.max(0, Math.floor(num(raw.speedLevel, 1))));
+  p.missionsCompleted = Array.isArray(raw && raw.missionsCompleted)
+    ? raw.missionsCompleted.filter((id) => typeof id === 'string') : [];
+  p.activeMission = raw && typeof raw.activeMission === 'string' ? raw.activeMission : null;
 
   p.version = SCHEMA_VERSION;
   return p;

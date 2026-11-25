@@ -266,7 +266,27 @@ export const VEHICLE_TYPES = {
   },
   coupe: { label: 'Coupe', w: 1.96, h: 1.12, l: 4.15, speedMin: 20, speedMax: 29, spawnWeight: 14, colors: [0xf43f5e, 0x38bdf8, 0xfacc15, 0xa855f7] },
   muscle: { label: 'Muscle', w: 2.08, h: 1.18, l: 4.55, speedMin: 22, speedMax: 32, spawnWeight: 12, colors: [0xf97316, 0x1e293b, 0xdc2626, 0xfbbf24] },
-  supercar: { label: 'Supercar', w: 2.12, h: 0.94, l: 4.45, speedMin: 27, speedMax: 38, spawnWeight: 8, colors: [0x00f5d4, 0xff2a85, 0xfef08a, 0x2563eb] }
+  supercar: { label: 'Supercar', w: 2.12, h: 0.94, l: 4.45, speedMin: 27, speedMax: 38, spawnWeight: 8, colors: [0x00f5d4, 0xff2a85, 0xfef08a, 0x2563eb] },
+  hatchback: { label: 'Hatchback', w: 1.85, h: 1.32, l: 3.85, speedMin: 14, speedMax: 22, spawnWeight: 6, colors: [0x38bdf8, 0xf97316, 0x22c55e, 0xe2e8f0] },
+  wagon: { label: 'Wagon', w: 1.98, h: 1.38, l: 4.5, speedMin: 14, speedMax: 23, spawnWeight: 6, colors: [0x64748b, 0x0ea5e9, 0xf59e0b, 0xf8fafc] },
+  minivan: { label: 'Minivan', w: 2.1, h: 1.72, l: 4.85, speedMin: 12, speedMax: 19, spawnWeight: 6, colors: [0xf8fafc, 0x94a3b8, 0x3b82f6] },
+  roadster: { label: 'Roadster', w: 1.94, h: 0.96, l: 4.05, speedMin: 23, speedMax: 33, spawnWeight: 6, colors: [0xef4444, 0xfacc15, 0x00f5d4, 0xf43f5e] },
+  rally_car: { label: 'Rally Car', w: 2.02, h: 1.24, l: 4.25, speedMin: 22, speedMax: 32, spawnWeight: 6, colors: [0x2563eb, 0xfacc15, 0xf8fafc, 0x16a34a] },
+  drift_car: { label: 'Drift Car', w: 1.98, h: 1.08, l: 4.2, speedMin: 22, speedMax: 31, spawnWeight: 6, colors: [0xff2a85, 0x00f5d4, 0xf97316] },
+  limousine: { label: 'Limousine', w: 2.08, h: 1.42, l: 6.2, speedMin: 16, speedMax: 24, spawnWeight: 6, colors: [0x0f172a, 0xf8fafc, 0x475569] },
+  grand_tourer: { label: 'Grand Tourer', w: 2.04, h: 1.12, l: 4.65, speedMin: 24, speedMax: 34, spawnWeight: 6, colors: [0x10b981, 0xf59e0b, 0x6366f1, 0xe2e8f0] },
+  suv_luxury: { label: 'Luxury SUV', w: 2.18, h: 1.68, l: 4.95, speedMin: 18, speedMax: 26, spawnWeight: 6, colors: [0x1e293b, 0xf8fafc, 0xd97706] },
+  pickup: { label: 'Pickup', w: 2.12, h: 1.62, l: 5.2, speedMin: 14, speedMax: 22, spawnWeight: 6, colors: [0xdc2626, 0x0284c7, 0xfbbf24, 0x475569] },
+  tow_truck: { label: 'Tow Truck', w: 2.25, h: 2.1, l: 6.1, speedMin: 12, speedMax: 19, spawnWeight: 6, colors: [0xf59e0b, 0xea580c, 0xfacc15] },
+  box_truck: { label: 'Box Truck', w: 2.38, h: 2.65, l: 6.8, speedMin: 10, speedMax: 16, spawnWeight: 6, colors: [0xf8fafc, 0x38bdf8, 0x94a3b8] },
+  ambulance: { label: 'Ambulance', w: 2.22, h: 2.25, l: 5.6, speedMin: 18, speedMax: 27, spawnWeight: 6, colors: [0xf8fafc, 0xef4444, 0x38bdf8] },
+  fire_truck: { label: 'Fire Truck', w: 2.45, h: 2.75, l: 7.6, speedMin: 14, speedMax: 22, spawnWeight: 6, colors: [0xdc2626, 0xef4444, 0xfacc15] },
+  swat_van: { label: 'SWAT Van', w: 2.32, h: 2.15, l: 5.8, speedMin: 16, speedMax: 24, spawnWeight: 6, colors: [0x0f172a, 0x1e3a8a, 0x334155] },
+  cement_mixer: { label: 'Cement Mixer', w: 2.48, h: 2.85, l: 7.3, speedMin: 9, speedMax: 14, spawnWeight: 6, colors: [0xfacc15, 0x94a3b8, 0xf97316] },
+  dump_truck: { label: 'Dump Truck', w: 2.42, h: 2.55, l: 6.6, speedMin: 10, speedMax: 16, spawnWeight: 6, colors: [0xf97316, 0xd97706, 0x475569] },
+  cruiser_bike: { label: 'Cruiser Bike', w: 1.02, h: 1.32, l: 2.35, speedMin: 17, speedMax: 26, spawnWeight: 6, colors: [0x0f172a, 0xd97706, 0xef4444] },
+  dirt_bike: { label: 'Dirt Bike', w: 0.9, h: 1.38, l: 2.1, speedMin: 19, speedMax: 29, spawnWeight: 6, colors: [0xf97316, 0x22c55e, 0x3b82f6] },
+  sport_bike: { label: 'Sport Bike', w: 0.92, h: 1.26, l: 2.18, speedMin: 24, speedMax: 35, spawnWeight: 6, colors: [0xff2a85, 0x00f5d4, 0xfacc15, 0xa855f7] },
 };
 
 export const SURVIVAL = {
@@ -355,5 +375,35 @@ export const SHOP = {
     supercar: 2200,
     bus: 1800
   },
-  stock: ['bike', 'coupe', 'muscle', 'supercar', 'bus']
+  stock: ['bike','coupe','muscle','supercar','bus','hatchback','wagon','minivan','roadster','rally_car','drift_car','limousine','grand_tourer','suv_luxury','pickup','tow_truck','box_truck','ambulance','fire_truck','swat_van','cement_mixer','dump_truck','cruiser_bike','dirt_bike','sport_bike']
 };
+
+export const MISSION_LIST = [
+  { id: 'm1_first_cruise', name: 'Avenue Warmup', type: 'cruise', minLevel: 1, reward: 120, xp: 50, target: 300, description: 'Drive 300m across city streets.' },
+  { id: 'm2_first_fare', name: 'Corner Pickup', type: 'taxi', minLevel: 1, reward: 150, xp: 65, fareCount: 1, description: 'Complete 1 taxi fare.' },
+  { id: 'm3_parcel_drop', name: 'Express Drop', type: 'delivery', minLevel: 2, reward: 180, xp: 80, timeLimit: 75, description: 'Reach the delivery marker in time.' },
+  { id: 'm4_clean_run', name: 'Smooth Operator', type: 'survive', minLevel: 2, reward: 200, xp: 90, timeLimit: 45, description: 'Drive for 45s without crashing.' },
+  { id: 'm5_boulevard_sprint', name: 'Grid Dash', type: 'sprint', minLevel: 3, reward: 260, xp: 120, checkpointCount: 3, timeLimit: 85, description: 'Hit 3 street checkpoints.' },
+  { id: 'm6_city_tour', name: 'District Hopper', type: 'cruise', minLevel: 4, reward: 320, xp: 150, target: 900, description: 'Drive 900m across districts.' },
+  { id: 'm7_night_cab', name: 'Shift Hustle', type: 'taxi', minLevel: 5, reward: 380, xp: 180, fareCount: 3, description: 'Complete 3 taxi fares.' },
+  { id: 'm8_rush_courier', name: 'Cross-Town Rush', type: 'delivery', minLevel: 6, reward: 450, xp: 220, timeLimit: 65, description: 'Reach the cross-town delivery marker.' },
+  { id: 'm9_cool_head', name: 'Unscathed Run', type: 'survive', minLevel: 7, reward: 550, xp: 270, timeLimit: 70, description: 'Survive 70s with zero crashes.' },
+  { id: 'm10_apex_circuit', name: 'Apex Sprint', type: 'sprint', minLevel: 8, reward: 650, xp: 340, checkpointCount: 3, timeLimit: 75, description: 'Clear 3 high-speed checkpoints.' },
+  { id: 'm11_master_cabby', name: 'Meow Cab Pro', type: 'taxi', minLevel: 9, reward: 780, xp: 420, fareCount: 5, description: 'Complete 5 taxi fares.' },
+  { id: 'm12_city_legend', name: 'Open City Legend', type: 'cruise', minLevel: 10, reward: 900, xp: 500, target: 2000, description: 'Drive 2000m like a city legend.' }
+];
+
+export const LEVEL_TITLES = [
+  'Rookie Wheel',
+  'Street Scout',
+  'Block Runner',
+  'Lane Drifter',
+  'District Driver',
+  'Traffic Ace',
+  'Night Cruiser',
+  'Route Master',
+  'Apex Chaser',
+  'City Outlaw',
+  'Metro Ace',
+  'Meow Legend'
+];

@@ -169,6 +169,40 @@ porches and gardens; softer lighting/shadows; zero console errors; no frame-rate
 
 ---
 
+## Step 8 — 25-vehicle free garage + missions and levels
+
+> LABEL PATCH 1 — config.js — ADD-ONLY: 20 new `VEHICLE_TYPES` entries (hatchback, wagon,
+> minivan, roadster, rally_car, drift_car, limousine, grand_tourer, suv_luxury, pickup,
+> tow_truck, box_truck, ambulance, fire_truck, swat_van, cement_mixer, dump_truck,
+> cruiser_bike, dirt_bike, sport_bike) and replace `SHOP.stock` with all 25 keys.
+>
+> LABEL PATCH 2 — index.html — REPLACEMENT for `#shop-panel-vehicles`: category tabs
+> (ALL/EVERYDAY/SPORTS/LUXURY/UTILITY/EMERGENCY/HEAVY/BIKES) and scrollable rows of
+> `data-vehicle` / `data-category` FREE buttons for all 25 vehicles.
+>
+> LABEL PATCH 3 — css/style.css — ADD-ONLY compact landscape shop strip styling.
+>
+> LABEL PATCH 4 — game.js — ADD-ONLY: import `VEHICLE_TYPES`, use `Object.keys(VEHICLE_TYPES)`
+> for the free check, wire `[data-category]` tab filtering.
+>
+> LABEL PATCH 5 — config.js — ADD-ONLY: `MISSION_LIST` (12 jobs: cruise, taxi, delivery,
+> survive, sprint with minLevel 1-10, rewards and XP) and `LEVEL_TITLES` array.
+>
+> LABEL PATCH 6 — cityStorage.js — ADD-ONLY `missionsCompleted` and `activeMission` fields.
+>
+> LABEL PATCH 7 — index.html — ADD-ONLY `#touch-missions` (JOB) button and `#mission-panel`
+> overlay with `#mission-list` and `#mission-level`.
+>
+> LABEL PATCH 8 — game.js — ADD-ONLY methods `_openMissions`, `_startMission`,
+> `_updateMissions`, `_completeMission`, `_missionText`, plus marker helpers. Wire button,
+> HUD text and `_loop()` call. Priorities: TAXI > ACTIVE MISSION > RACE > DEFAULT.
+> Fix double-count: `this.coins = CityStorage.get().coins` after rewards, never `+ reward` again.
+
+**Acceptance:** 25 free vehicles selectable; 12 jobs across 5 types, locked by level,
+replayable at reduced reward; coins/XP/missionsCompleted survive reload; zero console errors.
+
+---
+
 ## Final validation checklist (run after every step)
 
 ```powershell
