@@ -853,3 +853,5 @@ body::after {
     background: radial-gradient(circle at center, rgba(0, 0, 0, 0) 70%, rgba(4, 7, 18, 0.34) 100%);
   }
 }
+
+#touch-speed { border-color: #a78bfa; color: #ddd6fe; font-size: 9px; }

@@ -11,6 +11,7 @@ const DEFAULT_PROFILE = {
   ownedVehicles: ['sedan'],
   currentVehicle: 'sedan',
   layout: 'compact',
+  speedLevel: 1,
   xp: 0,
   level: 1,
   totalDistance: 0,
@@ -69,6 +70,7 @@ function sanitize(raw) {
     p.currentVehicle = raw.currentVehicle;
   }
   if (['compact', 'large', 'left', 'right'].includes(raw.layout)) p.layout = raw.layout;
+  p.speedLevel = Math.min(2, Math.max(0, Math.floor(num(raw.speedLevel, 1))));
 
   p.version = SCHEMA_VERSION;
   return p;

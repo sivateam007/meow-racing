@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CAR_CFG, COLORS, VEHICLE_TYPES, clamp, lerp } from './config.js';
+import { CAR_CFG, SPEED_LEVELS, COLORS, VEHICLE_TYPES, clamp, lerp } from './config.js';
 
 export class Car {
   constructor(scene, initialSkinId = 'meow_orange') {
@@ -16,6 +16,11 @@ export class Car {
     this.wheelSpin = 0;
     this.roll = 0;
     this.pitch = 0;
+
+    this.speedLevel = 1;
+    this.maxSpeed = CAR_CFG.maxSpeed;
+    this.accel = CAR_CFG.accel;
+    this.driftMaxSpeed = CAR_CFG.driftMaxSpeed;
 
     this.wheels = [];
     this.frontPivots = [];
@@ -207,6 +212,17 @@ setVehicleType(typeKey) {
       else this.rearWheelPositions.push(new THREE.Vector3(c.x, 0.15, c.z));
     }
   }
+  setSpeedLevel(index = 1) {
+    const i = clamp(Math.round(index), 0, SPEED_LEVELS.length - 1);
+    const level = SPEED_LEVELS[i];
+    this.speedLevel = i;
+    this.maxSpeed = level.maxSpeed;
+    this.accel = level.accel;
+    this.driftMaxSpeed = level.driftMaxSpeed;
+    if (this.speed > this.maxSpeed) this.speed = this.maxSpeed;
+    return level;
+  }
+
   reset(x = 0, z = 0, heading = 0) {
     this.speed = 0;
     this.lateralSpeed = 0;
@@ -241,7 +257,7 @@ setVehicleType(typeKey) {
 
     const movingForward = this.speed >= 0;
     if (forward && !backward) {
-      this.speed += CAR_CFG.accel * safeDt;
+      this.speed += this.accel * safeDt;
     } else if (backward && !forward) {
       if (this.speed > 1.5) {
         this.speed -= CAR_CFG.brakeDecel * safeDt;
@@ -255,7 +271,7 @@ setVehicleType(typeKey) {
     }
 
     this.drifting = driftKey && Math.abs(this.speed) > 9 && Math.abs(steerDir) > 0.05;
-    const maxFwd = this.drifting ? CAR_CFG.driftMaxSpeed : CAR_CFG.maxSpeed;
+    const maxFwd = this.drifting ? this.driftMaxSpeed : this.maxSpeed;
     this.speed = clamp(this.speed, -CAR_CFG.reverseMaxSpeed, maxFwd);
 
     const reverseSign = this.speed < -0.25 ? -1 : 1;

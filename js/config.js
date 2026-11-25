@@ -81,6 +81,12 @@ export const CAR_CFG = {
   ]
 };
 
+export const SPEED_LEVELS = [
+  { label: 'ECO', maxSpeed: 18, accel: 12, driftMaxSpeed: 16 },
+  { label: 'NORMAL', maxSpeed: 30, accel: 18, driftMaxSpeed: 27 },
+  { label: 'SPORT', maxSpeed: 42, accel: 26, driftMaxSpeed: 38 }
+];
+
 export const TRAFFIC_CFG = {
   poolSize: 40,
   spawnMinDist: 38,
@@ -264,9 +270,11 @@ export const VEHICLE_TYPES = {
 };
 
 export const SURVIVAL = {
-  maxHealth: 100,
-  crashDamage: 18,
-  pedPenalty: 10,
+  maxHealth: 200,
+  crashDamage: 8,
+  pedPenalty: 5,
+  healthRegenPerSec: 1.5,
+  healthRegenDelay: 6,
   wantedDecay: 0.12,
   wantedMax: 5,
   missionReward: 150,

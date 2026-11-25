@@ -1,6 +1,6 @@
 ﻿import * as THREE from 'three';
 import anime from 'animejs';
-import { WORLD_CFG, CAR_CFG, COLORS, INPUT, SURVIVAL, FUEL, TRAIN, TAXI, SHOP, clamp } from './config.js';
+import { WORLD_CFG, CAR_CFG, SPEED_LEVELS, COLORS, INPUT, SURVIVAL, FUEL, TRAIN, TAXI, SHOP, clamp } from './config.js';
 import Car from './car.js';
 import World from './world.js';
 import Effects from './effects.js';
@@ -27,6 +27,9 @@ export class Game {
     this.ownedVehicles = (this.profile.ownedVehicles || ['sedan']).slice();
     this.currentVehicle = this.profile.currentVehicle || 'sedan';
     this.controlLayout = this.profile.layout || 'compact';
+    this.speedLevel = this.profile.speedLevel ?? 1;
+    this.health = SURVIVAL.maxHealth;
+    this._lastCrashTime = -999;
     this._lastCarPos = null;
     this._distanceAccum = 0;
     this.collisionCooldown = 0;
@@ -42,6 +45,7 @@ export class Game {
 
     this._initScene();
     this.car = new Car(this.scene);
+    if (typeof this.car.setSpeedLevel === 'function') this.car.setSpeedLevel(this.speedLevel);
     this.world = new World(this.scene, this.sunLight);
     this.effects = new Effects(this.scene, this.camera, this.sunLight);
 
@@ -297,16 +301,37 @@ export class Game {
       });
     }
 
+    const touchSpeed = document.getElementById('touch-speed');
+    if (touchSpeed) {
+      touchSpeed.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.speedLevel = ((this.speedLevel || 0) + 1) % SPEED_LEVELS.length;
+        if (this.car && typeof this.car.setSpeedLevel === 'function') {
+          this.car.setSpeedLevel(this.speedLevel);
+        }
+        CityStorage.save({ speedLevel: this.speedLevel });
+        this._updateHud();
+        if (typeof this._toast === 'function') {
+          this._toast(`SPEED ${SPEED_LEVELS[this.speedLevel].label}`, 1400);
+        }
+      });
+    }
+
     window.addEventListener('keydown', (e) => {
       if (e.code === 'KeyP') {
         this.paused = !this.paused;
         const pOv = document.getElementById('pause-overlay');
         if (pOv) pOv.classList.toggle('hidden', !this.paused);
       }
+      if (e.code === 'KeyV') {
+        const btn = document.getElementById('touch-speed');
+        if (btn) btn.click();
+      }
     });
   }
 
-_applyLayoutPreset(preset = 'compact') {
+  _applyLayoutPreset(preset = 'compact') {
     const valid = ['compact', 'large', 'left', 'right'];
     const chosen = valid.includes(preset) ? preset : 'compact';
     this.controlLayout = chosen;
@@ -352,9 +377,14 @@ _applyLayoutPreset(preset = 'compact') {
     this.ownedVehicles = Array.isArray(profile.ownedVehicles) && profile.ownedVehicles.length
       ? profile.ownedVehicles.slice() : ['sedan'];
     this.currentVehicle = this.ownedVehicles.includes(profile.currentVehicle) ? profile.currentVehicle : 'sedan';
+    this.speedLevel = typeof profile.speedLevel === 'number' ? profile.speedLevel : this.speedLevel;
+    if (this.car && typeof this.car.setSpeedLevel === 'function') {
+      this.car.setSpeedLevel(this.speedLevel);
+    }
     if (this.car && typeof this.car.setVehicleType === 'function') {
       this.car.setVehicleType(this.currentVehicle);
     }
+    this.health = SURVIVAL.maxHealth;
     this._lastCarPos = null;
     if (typeof FUEL !== 'undefined') this.fuel = FUEL.startAmount ?? FUEL.max ?? 100;
     if (this.world && typeof this.world._startStreetRace === 'function') {
@@ -488,6 +518,7 @@ _applyLayoutPreset(preset = 'compact') {
 
   _onCrash(worldPos) {
     this.health = (typeof this.health === 'number' ? this.health : SURVIVAL.maxHealth) - SURVIVAL.crashDamage;
+    this._lastCrashTime = this.elapsedTime || 0;
     this.wanted = Math.min(SURVIVAL.wantedMax, (this.wanted || 0) + 1);
     if (this.health <= 0) {
       this.health = SURVIVAL.maxHealth;
@@ -678,6 +709,13 @@ _toast(msg, ms = 1800) {
 
     const levelEl = document.getElementById('hud-level');
     if (levelEl) levelEl.textContent = `LV ${Math.max(1, Math.floor(this.level || 1))}`;
+
+    const speedBtn = document.getElementById('touch-speed');
+    if (speedBtn) {
+      const idx = Math.min(SPEED_LEVELS.length - 1, Math.max(0, this.speedLevel || 0));
+      speedBtn.textContent = `SPD ${idx + 1}`;
+      speedBtn.setAttribute('aria-label', `Speed level ${idx + 1}: ${SPEED_LEVELS[idx].label}`);
+    }
 
     const timeEl = document.getElementById('hud-time');
     if (timeEl) {
@@ -902,6 +940,13 @@ _toast(msg, ms = 1800) {
     if (this.state === 'play') {
       this.elapsedTime += dt;
       this.wanted = Math.max(0, (this.wanted || 0) - SURVIVAL.wantedDecay * dt);
+
+      const maxHp = SURVIVAL.maxHealth || 100;
+      const sinceCrash = this.elapsedTime - (this._lastCrashTime || 0);
+      if (sinceCrash >= (SURVIVAL.healthRegenDelay || 6)) {
+        this.health = Math.min(maxHp,
+          (typeof this.health === 'number' ? this.health : maxHp) + (SURVIVAL.healthRegenPerSec || 0) * dt);
+      }
     }
 
     this.car.update(dt, input);
