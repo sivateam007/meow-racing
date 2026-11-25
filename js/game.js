@@ -265,6 +265,25 @@ export class Game {
         if (typeof this._openMissions === 'function') this._openMissions();
       });
     }
+    const deliveryBtn = document.getElementById('touch-delivery');
+    if (deliveryBtn) {
+      deliveryBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const missions = typeof MISSION_LIST !== 'undefined' ? MISSION_LIST : [];
+        const level = Math.max(1, Math.floor(this.level || 1));
+        const jobs = missions.filter((m) => m.type === 'pizza' && (m.minLevel || 1) <= level);
+        if (!jobs.length) {
+          const next = missions.find((m) => m.type === 'pizza');
+          this._toast(next ? `DELIVERY UNLOCKS AT LV ${next.minLevel}` : 'NO DELIVERY JOBS', 2000);
+          return;
+        }
+        const job = jobs[jobs.length - 1];
+        if (this.activeMission && typeof this._clearMissionMarker === 'function') this._clearMissionMarker();
+        this._startMission(job.id);
+      });
+    }
+
     const missionCloseBtn = document.getElementById('mission-close-button');
     if (missionCloseBtn) {
       missionCloseBtn.addEventListener('click', () => {
@@ -880,10 +899,14 @@ _clearMissionMarker() {
     return true;
   }
 
-  _pizzaText() {
+  _pizzaText(pos = null) {
     const j = this.pizzaJob;
     if (!j || !j.active) return '';
-    return `${j.phase === 'pickup' ? 'PICKUP' : 'DELIVER'} ${j.done}/${j.orders} • ${Math.max(0, Math.ceil(j.timeLeft))}s • TIP $${j.tips}`;
+    let dist = '';
+    if (pos && j.target) {
+      dist = ` • ${Math.round(Math.hypot(pos.x - j.target.x, pos.z - j.target.z))}m`;
+    }
+    return `${j.phase === 'pickup' ? 'PICKUP' : 'DELIVER'} ${j.done}/${j.orders}${dist} • ${Math.max(0, Math.ceil(j.timeLeft))}s • TIP $${j.tips}`;
   }
 
   _updatePizzaJob(dt, carPos) {
@@ -1127,7 +1150,8 @@ _clearMissionMarker() {
     const timerPart = typeof mState.timeLeft === 'number' ? ` • ${Math.ceil(mState.timeLeft)}s` : '';
 
     if (def.type === 'pizza') {
-      return `PIZZA: ${this._pizzaText() || 'GET READY'}`;
+      const pp = this.car && typeof this.car.getPosition === 'function' ? this.car.getPosition() : null;
+      return `PIZZA: ${this._pizzaText(pp) || 'GET READY'}`;
     }
     if (def.type === 'cruise') {
       return `JOB: ${def.name.toUpperCase()} (${cur}/${tgt}m)${timerPart}`;
@@ -1156,7 +1180,8 @@ _clearMissionMarker() {
 
     const pizzaHud = document.getElementById('pizza-hud');
     if (pizzaHud) {
-      const txt = typeof this._pizzaText === 'function' ? this._pizzaText() : '';
+      const pizzaPos = this.car && typeof this.car.getPosition === 'function' ? this.car.getPosition() : null;
+      const txt = typeof this._pizzaText === 'function' ? this._pizzaText(pizzaPos) : '';
       if (txt) {
         pizzaHud.textContent = txt;
         pizzaHud.classList.remove('hidden');
@@ -1294,6 +1319,20 @@ _clearMissionMarker() {
       ctx.strokeRect(fx - 5, fy - 5, 10, 10);
       ctx.font = 'bold 8px sans-serif';
       ctx.fillText('F', fx - 2, fy - 7);
+    }
+
+    const pizzaShops = this.world.pizzaShops || [];
+    for (const shop of pizzaShops) {
+      const fx = toX(shop.x);
+      const fy = toY(shop.z);
+      if (fx < -6 || fx > w + 6 || fy < -6 || fy > h + 6) continue;
+      ctx.fillStyle = '#f97316';
+      ctx.fillRect(fx - 3, fy - 3, 6, 6);
+      ctx.strokeStyle = 'rgba(249, 115, 22, 0.75)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(fx - 5, fy - 5, 10, 10);
+      ctx.font = 'bold 8px sans-serif';
+      ctx.fillText('P', fx - 2, fy - 7);
     }
 
     let obj = null;
