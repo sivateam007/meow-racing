@@ -155,6 +155,7 @@ _buildWindowTextures() {
       groundMat
     );
     groundMesh.rotation.x = -Math.PI * 0.5;
+    groundMesh.position.y = -0.5;
     groundMesh.receiveShadow = true;
     this.cityGroup.add(groundMesh);
 
@@ -163,7 +164,7 @@ _buildWindowTextures() {
       new THREE.MeshStandardMaterial({ color: COLORS.asphalt, roughness: 0.88, metalness: 0.06 })
     );
     cityPad.rotation.x = -Math.PI * 0.5;
-    cityPad.position.y = 0.008;
+    cityPad.position.y = 0;
     cityPad.receiveShadow = true;
     this.cityGroup.add(cityPad);
 
@@ -423,13 +424,13 @@ _buildWindowTextures() {
       const x = cx + Math.cos(a) * r;
       const z = cz + Math.sin(a) * r;
       if (Math.abs(x) < clear && Math.abs(z) < clear) continue;
-      prop.group.position.set(x, 0, z);
+      prop.group.position.set(x, -0.5, z);
       prop.group.rotation.y = Math.random() * Math.PI * 2;
       const s = randRange(0.7, 1.7);
       prop.group.scale.setScalar(s);
       return;
     }
-    prop.group.position.set(cx + maxR, 0, cz + maxR);
+    prop.group.position.set(cx + maxR, -0.5, cz + maxR);
   }
 
   _updateOpenWorld(playerPos = { x: 0, z: 0 }) {
