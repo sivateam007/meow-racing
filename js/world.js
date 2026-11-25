@@ -305,6 +305,19 @@ export class World {
     this._buildNaturalHomes();
     this._decorateBuildings();
     this._addStreetDetails();
+    this._clearRoadColliders();
+  }
+
+  _clearRoadColliders() {
+    const half = (WORLD_CFG.roadWidth || 14) * 0.5 + 0.5;
+    const streets = Array.isArray(this.streetCoords) ? this.streetCoords : [];
+    this.colliders = this.colliders.filter((c) => {
+      for (const s of streets) {
+        if (c.minX < s + half && c.maxX > s - half) return false;
+        if (c.minZ < s + half && c.maxZ > s - half) return false;
+      }
+      return true;
+    });
   }
 
   _buildSkyline() {
@@ -1265,7 +1278,7 @@ _buildGreenDistricts() {
       this.cityGroup.add(dash);
     }
 
-    for (const hOff of [-16, 16]) {
+    for (const hOff of [-30, 30]) {
       const hangar = new THREE.Mesh(new THREE.BoxGeometry(14, 7, 18), hangarMat);
       hangar.position.set(ax + 20, 3.5, az + hOff);
       hangar.castShadow = true;
@@ -1355,12 +1368,12 @@ _buildGreenDistricts() {
       }
 
       const shop = new THREE.Mesh(new THREE.BoxGeometry(8, 3.6, 6), shopMat);
-      shop.position.set(0, 1.8, -9.5);
+      shop.position.set(0, 1.8, 13);
       shop.castShadow = true;
       group.add(shop);
       this.colliders.push({
         minX: st.x - 4.1, maxX: st.x + 4.1,
-        minZ: st.z - 12.6, maxZ: st.z - 6.4
+        minZ: st.z + 9.4, maxZ: st.z + 16.6
       });
 
       const sign = new THREE.Mesh(new THREE.BoxGeometry(3.2, 1.1, 0.3), signMat);
@@ -1588,7 +1601,7 @@ _buildRailway() {
     const streets = Array.isArray(this.streetCoords) && this.streetCoords.length > 0 ? this.streetCoords : [0];
     const idx = Math.min(streets.length - 1, Math.max(0, Math.floor(streets.length * 0.35)));
     const sx = (streets[idx] || 0) + (WORLD_CFG.roadWidth || 14) * 0.5 + 11;
-    const sz = streets[idx] || 0;
+    const sz = (streets[idx] || 0) + (WORLD_CFG.roadWidth || 14) * 0.5 + 12;
     this.shopPosition = { x: sx, z: sz };
 
     const grp = new THREE.Group();
