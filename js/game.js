@@ -199,6 +199,8 @@ export class Game {
     });
 
     const touchMap = [
+      { id: 'touch-left', key: 'left' },
+      { id: 'touch-right', key: 'right' },
       { id: 'touch-gas', key: 'gas' },
       { id: 'touch-brake', key: 'brake' },
       { id: 'touch-nos', key: 'nos' }
@@ -433,6 +435,16 @@ export class Game {
         e.stopPropagation();
         const shopPanel = document.getElementById('shop-panel-vehicles');
         if (shopPanel) shopPanel.classList.toggle('hidden');
+      });
+    }
+
+    const shopClose = document.getElementById('shop-close');
+    if (shopClose) {
+      shopClose.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const shopPanel = document.getElementById('shop-panel-vehicles');
+        if (shopPanel) shopPanel.classList.add('hidden');
       });
     }
 

@@ -1381,3 +1381,23 @@ body[data-layout="right"] .drive-pod-left {
   .minimap-card { width: 112px; height: 112px; }
   .hud-top-center { top: 6px; }
 }
+/* === SHOP CLOSE + PEDAL LIFT === */
+.shop-panel-header .shop-close {
+  margin-left: auto;
+  min-width: 34px;
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1.5px solid rgba(248, 113, 113, 0.7);
+  background: rgba(127, 29, 29, 0.45);
+  color: #fecaca;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+.drive-pod-right { bottom: 40px; }
+@media (orientation: landscape) and (max-height: 560px) {
+  .drive-pod-right { bottom: 30px; }
+}
