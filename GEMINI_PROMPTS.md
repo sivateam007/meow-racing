@@ -406,6 +406,28 @@ enters buildings; people/cars have distinct detailed silhouettes; zero console e
 
 ---
 
+## Step 17 — Landmark tower and extra city detail
+
+> LABEL PATCH 1 — css/style.css — DELETE the `::before` dot rules on HUD action buttons.
+>
+> LABEL PATCH 2 — world.js — reserve a landmark block index and add it to all builder skip checks.
+>
+> LABEL PATCH 3 — world.js — ADD `_buildStarkTower()`: tiered glass tower, spire/beacon,
+> glowing 'A' sign, red/blue lights, plaza, `this.landmarkPosition`.
+>
+> LABEL PATCH 4 — game.js — ADD landmark `A` icon to the full minimap.
+>
+> LABEL PATCH 5 — world.js — ADD `_addCityBillboards()` (60 neon signs on tall facades).
+>
+> LABEL PATCH 6 — world.js — ADD `_enhanceStreetTrees()` (layered canopy + ground shadow).
+>
+> LABEL PATCH 7 — css/style.css — subtle glass blur/border polish on `.hud-chip`.
+
+**Acceptance:** no dot before TAXI, tower exists on its own block, 60 billboards, map shows `A`,
+zero console errors.
+
+---
+
 ## Final validation checklist (run after every step)
 
 ```powershell

@@ -278,6 +278,7 @@ const palettes = [
       Math.floor(totalBlocks * 0.46),
       Math.floor(totalBlocks * 0.76)
     ]);
+    this.landmarkBlockKey = this.blockCenters.length > 0 ? Math.floor(this.blockCenters.length * 0.56) : -1;
     this.fuelBlockKeys = new Set(
       [0.30, 0.55, 0.66, 0.88]
         .map((f) => Math.floor(totalBlocks * f))
@@ -313,7 +314,7 @@ const palettes = [
         this.cityGroup.add(bulb);
       }
 
-      if (this.pizzaBlockKeys.has(blockIndex) || (this.fuelBlockKeys && this.fuelBlockKeys.has(blockIndex))) continue;
+      if (this.pizzaBlockKeys.has(blockIndex) || (this.fuelBlockKeys && this.fuelBlockKeys.has(blockIndex)) || blockIndex === this.landmarkBlockKey) continue;
 
       const subMode = (block.bx + block.bz) % 3;
       const footprints =
@@ -393,6 +394,7 @@ const palettes = [
     this._buildVehicleShop();
     this._buildNaturalHomes();
     this._buildCityGardens();
+    this._enhanceStreetTrees();
     this._addGroundAO();
     this._decorateBuildings();
     this._addStreetDetails();
@@ -402,7 +404,9 @@ const palettes = [
     this._buildSkyDome();
     this._buildOpenWorld();
     this._buildPizzaShops();
+    this._buildStarkTower();
     this._addNightGlow();
+    this._addCityBillboards();
     this._clearRoadColliders();
   }
 
@@ -738,7 +742,7 @@ _buildCityGardens() {
 
     for (let i = 0; i < this.blockCenters.length && blocksBuilt < 120; i++) {
       const b = this.blockCenters[i];
-      if ((this.pizzaBlockKeys && this.pizzaBlockKeys.has(i)) || (this.fuelBlockKeys && this.fuelBlockKeys.has(i))) continue;
+      if ((this.pizzaBlockKeys && this.pizzaBlockKeys.has(i)) || (this.fuelBlockKeys && this.fuelBlockKeys.has(i)) || i === this.landmarkBlockKey) continue;
 
       const nx = b.bx / maxIdx;
       const nz = b.bz / maxIdx;
@@ -978,6 +982,226 @@ _addGroundAO() {
       const pad = new THREE.Mesh(aoGeo, aoMat);
       pad.position.set(0, 0.05, 0);
       bldg.add(pad);
+    }
+  }
+
+_buildStarkTower() {
+    if (!this.cityGroup || !Array.isArray(this.blockCenters) || this.blockCenters.length === 0 || typeof THREE === 'undefined') return;
+    const idx = typeof this.landmarkBlockKey === 'number' && this.landmarkBlockKey >= 0
+      ? Math.min(this.blockCenters.length - 1, this.landmarkBlockKey)
+      : Math.floor(this.blockCenters.length * 0.56);
+    const b = this.blockCenters[idx];
+    if (!b) return;
+
+    const baseY = WORLD_CFG.sidewalkHeight || 0;
+    const grp = new THREE.Group();
+    grp.position.set(b.x, baseY, b.z);
+    this.landmarkPosition = { x: b.x, z: b.z };
+
+    // Ground plaza & central fountain
+    const plazaMat = new THREE.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 0.72, metalness: 0.1 });
+    const waterMat = new THREE.MeshStandardMaterial({
+      color: 0x38bdf8,
+      emissive: 0x0284c7,
+      emissiveIntensity: 0.25,
+      roughness: 0.15,
+      metalness: 0.6
+    });
+    const plaza = new THREE.Mesh(new THREE.BoxGeometry(28, 0.24, 28), plazaMat);
+    plaza.position.y = 0.12;
+    plaza.receiveShadow = true;
+    grp.add(plaza);
+
+    const fountainRim = new THREE.Mesh(new THREE.CylinderGeometry(3.6, 3.9, 0.7, 18), plazaMat);
+    fountainRim.position.set(0, 0.45, 10.5);
+    grp.add(fountainRim);
+
+    const fountainWater = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.2, 0.45, 18), waterMat);
+    fountainWater.position.set(0, 0.52, 10.5);
+    grp.add(fountainWater);
+
+    // Layered glass tiers narrowing upward
+    const glassMat = new THREE.MeshStandardMaterial({
+      color: 0x38bdf8,
+      emissive: 0x0369a1,
+      emissiveIntensity: 0.32,
+      roughness: 0.18,
+      metalness: 0.78
+    });
+    const ribMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4, metalness: 0.8 });
+
+    const tier1 = new THREE.Mesh(new THREE.BoxGeometry(14, 22, 14), glassMat);
+    tier1.position.y = 11.2;
+    tier1.castShadow = true;
+    tier1.receiveShadow = true;
+    grp.add(tier1);
+
+    const tier2 = new THREE.Mesh(new THREE.BoxGeometry(10.5, 18, 10.5), glassMat);
+    tier2.position.y = 31.2;
+    tier2.castShadow = true;
+    grp.add(tier2);
+
+    const tier3 = new THREE.Mesh(new THREE.BoxGeometry(7.2, 14, 7.2), glassMat);
+    tier3.position.y = 47.2;
+    grp.add(tier3);
+
+    // Structural vertical ribs on tier 1
+    for (const rx of [-7.1, 7.1]) {
+      for (const rz of [-7.1, 7.1]) {
+        const rib = new THREE.Mesh(new THREE.BoxGeometry(0.45, 22, 0.45), ribMat);
+        rib.position.set(rx, 11.2, rz);
+        grp.add(rib);
+      }
+    }
+
+    // Rooftop spire + red/blue accent beacons
+    const spire = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.75, 11, 10), ribMat);
+    spire.position.y = 59.5;
+    grp.add(spire);
+
+    const redBeacon = new THREE.Mesh(
+      new THREE.SphereGeometry(0.42, 10, 10),
+      new THREE.MeshBasicMaterial({ color: 0xef4444 })
+    );
+    redBeacon.position.set(0, 65.2, 0);
+    grp.add(redBeacon);
+
+    const blueBand = new THREE.Mesh(
+      new THREE.BoxGeometry(7.5, 0.55, 7.5),
+      new THREE.MeshBasicMaterial({ color: 0x38bdf8 })
+    );
+    blueBand.position.set(0, 53.8, 0);
+    grp.add(blueBand);
+
+    // Glowing 'A' emblem on front facade
+    const aCanvas = document.createElement('canvas');
+    aCanvas.width = 128;
+    aCanvas.height = 128;
+    const aCtx = aCanvas.getContext('2d');
+    aCtx.fillStyle = '#090d16';
+    aCtx.fillRect(0, 0, 128, 128);
+    aCtx.strokeStyle = '#38bdf8';
+    aCtx.lineWidth = 6;
+    aCtx.strokeRect(6, 6, 116, 116);
+    aCtx.fillStyle = '#e0f2fe';
+    aCtx.font = 'bold 84px sans-serif';
+    aCtx.textAlign = 'center';
+    aCtx.textBaseline = 'middle';
+    aCtx.fillText('A', 64, 68);
+
+    const aTex = new THREE.CanvasTexture(aCanvas);
+    aTex.colorSpace = THREE.SRGBColorSpace;
+    const emblem = new THREE.Mesh(
+      new THREE.PlaneGeometry(5.6, 5.6),
+      new THREE.MeshBasicMaterial({ map: aTex })
+    );
+    emblem.position.set(0, 47.5, 3.66);
+    grp.add(emblem);
+
+    this.cityGroup.add(grp);
+  }
+
+_addCityBillboards() {
+    if (!this.cityGroup || typeof THREE === 'undefined') return;
+    if (!Array.isArray(this.cityBillboards)) {
+      this.cityBillboards = [];
+    }
+
+    const words = ['CITY', 'MEOW', 'NOS', 'PIZZA'];
+    const signTextures = words.map((word, idx) => {
+      const c = document.createElement('canvas');
+      c.width = 128;
+      c.height = 64;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(0, 0, 128, 64);
+      const borderCols = ['#38bdf8', '#f59e0b', '#a855f7', '#fb923c'];
+      ctx.strokeStyle = borderCols[idx % borderCols.length];
+      ctx.lineWidth = 4;
+      ctx.strokeRect(4, 4, 120, 56);
+      ctx.fillStyle = '#f8fafc';
+      ctx.font = 'bold 28px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(word, 64, 34);
+      const tex = new THREE.CanvasTexture(c);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    });
+
+    const boardGeo = new THREE.PlaneGeometry(4.4, 2.2);
+    const targets = [];
+
+    this.cityGroup.traverse((obj) => {
+      if (!obj || !obj.isMesh || !obj.geometry || !obj.geometry.parameters) return;
+      const h = obj.geometry.parameters.height;
+      const w = obj.geometry.parameters.width;
+      if (typeof h === 'number' && h >= 14 && typeof w === 'number' && w >= 6) {
+        targets.push(obj);
+      }
+    });
+
+    const limit = Math.min(targets.length, 60);
+    for (let i = 0; i < limit; i++) {
+      const bldg = targets[i];
+      const d = (bldg.geometry.parameters && bldg.geometry.parameters.depth) || 8;
+      const mat = new THREE.MeshBasicMaterial({
+        map: signTextures[i % signTextures.length],
+        side: THREE.DoubleSide
+      });
+      const sign = new THREE.Mesh(boardGeo, mat);
+      const yPos = Math.min(18, (bldg.geometry.parameters.height || 16) * 0.42);
+      sign.position.set(0, yPos, d * 0.5 + 0.12);
+      bldg.add(sign);
+      this.cityBillboards.push(sign);
+    }
+  }
+
+_enhanceStreetTrees() {
+    if (!this.cityGroup || typeof THREE === 'undefined') return;
+
+    const crowns = [];
+    this.cityGroup.traverse((obj) => {
+      if (!obj || !obj.isMesh || !obj.geometry || !obj.geometry.parameters) return;
+      const gType = obj.geometry.type;
+      const p = obj.geometry.parameters;
+      if (gType === 'ConeGeometry' && typeof p.radius === 'number' && typeof p.height === 'number' && p.radius <= 2.2 && p.height <= 4.2) {
+        crowns.push(obj);
+      }
+    });
+
+    const upperCrownGeo = new THREE.ConeGeometry(0.95, 2.0, 6);
+    const baseMat = new THREE.MeshStandardMaterial({ color: 0x3b2314, roughness: 0.9 });
+    const baseGeo = new THREE.CylinderGeometry(0.24, 0.34, 0.55, 6);
+    const shadowMat = new THREE.MeshBasicMaterial({
+      color: 0x090d16,
+      transparent: true,
+      opacity: 0.28,
+      depthWrite: false
+    });
+    const shadowGeo = new THREE.CircleGeometry(1.45, 10);
+    shadowGeo.rotateX(-Math.PI * 0.5);
+
+    const limit = Math.min(crowns.length, 120);
+    for (let i = 0; i < limit; i++) {
+      const crown = crowns[i];
+      const crownMat = crown.material;
+
+      const topTier = new THREE.Mesh(upperCrownGeo, crownMat);
+      topTier.position.set(0, 1.35, 0);
+      crown.add(topTier);
+
+      const collar = new THREE.Mesh(baseGeo, baseMat);
+      collar.position.set(crown.position.x, 0.28, crown.position.z);
+      if (crown.parent) {
+        crown.parent.add(collar);
+      }
+
+      const disc = new THREE.Mesh(shadowGeo, shadowMat);
+      disc.position.set(crown.position.x, 0.04, crown.position.z);
+      if (crown.parent) {
+        crown.parent.add(disc);
+      }
     }
   }
 
@@ -2089,7 +2313,7 @@ _buildGreenDistricts() {
     let placed = 0;
 
     for (let i = 0; i < this.blockCenters.length && placed < 260; i++) {
-      if ((this.pizzaBlockKeys && this.pizzaBlockKeys.has(i)) || (this.fuelBlockKeys && this.fuelBlockKeys.has(i))) continue;
+      if ((this.pizzaBlockKeys && this.pizzaBlockKeys.has(i)) || (this.fuelBlockKeys && this.fuelBlockKeys.has(i)) || i === this.landmarkBlockKey) continue;
       const b = this.blockCenters[i];
       const nx = b.bx / maxIdx;
       const nz = b.bz / maxIdx;
@@ -2930,7 +3154,7 @@ _buildNaturalHomes() {
     let built = 0;
 
     for (let i = 0; i < this.blockCenters.length && built < 130; i++) {
-      if ((this.pizzaBlockKeys && this.pizzaBlockKeys.has(i)) || (this.fuelBlockKeys && this.fuelBlockKeys.has(i))) continue;
+      if ((this.pizzaBlockKeys && this.pizzaBlockKeys.has(i)) || (this.fuelBlockKeys && this.fuelBlockKeys.has(i)) || i === this.landmarkBlockKey) continue;
       const b = this.blockCenters[i];
       const nx = b.bx / maxIdx;
       const nz = b.bz / maxIdx;
@@ -3047,7 +3271,7 @@ _decorateBuildings() {
     let added = 0;
 
     for (let i = 0; i < this.blockCenters.length && added < 140; i++) {
-      if ((this.pizzaBlockKeys && this.pizzaBlockKeys.has(i)) || (this.fuelBlockKeys && this.fuelBlockKeys.has(i))) continue;
+      if ((this.pizzaBlockKeys && this.pizzaBlockKeys.has(i)) || (this.fuelBlockKeys && this.fuelBlockKeys.has(i)) || i === this.landmarkBlockKey) continue;
       const b = this.blockCenters[i];
       const nx = b.bx / maxIdx;
       const nz = b.bz / maxIdx;
