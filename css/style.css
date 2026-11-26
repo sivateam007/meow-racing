@@ -1360,3 +1360,24 @@ body[data-layout="right"] .drive-pod-left {
     0 6px 18px rgba(0, 0, 0, 0.38),
     0 0 12px rgba(56, 189, 248, 0.14);
 }
+
+/* === SHORT LANDSCAPE MOBILE FIX === */
+@media (orientation: landscape) and (max-height: 560px) {
+  .drive-pod-left { left: 10px; bottom: 10px; }
+  .drive-pod-right { right: 10px; bottom: 10px; }
+  .steering-ring { flex-direction: row; gap: 8px; padding: 5px 8px; }
+  .steer-buttons-row { flex-direction: row; gap: 8px; }
+  .steer-slider { width: 112px; height: 34px; }
+  .touch-steer { width: 54px; height: 54px; min-width: 54px; min-height: 54px; font-size: 16px; }
+  .pedal-cluster { flex-direction: row; align-items: flex-end; gap: 8px; }
+  .touch-gas { width: 68px; height: 68px; min-width: 68px; min-height: 68px; font-size: 11px; }
+  .touch-brake { width: 56px; height: 56px; min-width: 56px; min-height: 56px; font-size: 10px; }
+  .touch-nos { width: 56px; height: 44px; min-width: 56px; min-height: 44px; font-size: 10px; }
+  .hud-action-row { gap: 5px; }
+  .hud-action-row-right { gap: 5px; }
+  .hud-action-row .touch-btn,
+  .hud-action-row-right .touch-btn { width: 48px; min-width: 48px; height: 42px; min-height: 42px; font-size: 8px; }
+  #touch-speed { min-width: 48px; padding: 0 4px; }
+  .minimap-card { width: 112px; height: 112px; }
+  .hud-top-center { top: 6px; }
+}
