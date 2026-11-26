@@ -45,17 +45,17 @@ export class World {
   }
 
 _buildWindowTextures() {
-    const palettes = [
-      { wallTop: '#f8fafc', wallBot: '#cbd5e1', frame: '#64748b', lit: ['#fef08a', '#fde047', '#bae6fd'], dark: '#334155', blind: '#94a3b8' },
-      { wallTop: '#fed7aa', wallBot: '#fdba74', frame: '#9a3412', lit: ['#fef9c3', '#fed7aa', '#fef08a'], dark: '#7c2d12', blind: '#f97316' },
-      { wallTop: '#bfdbfe', wallBot: '#93c5fd', frame: '#1e40af', lit: ['#fef08a', '#e0f2fe', '#ffffff'], dark: '#1e3a8a', blind: '#60a5fa' },
-      { wallTop: '#bbf7d0', wallBot: '#86efac', frame: '#166534', lit: ['#fef08a', '#f0fdf4', '#ffffff'], dark: '#14532d', blind: '#4ade80' },
-      { wallTop: '#fbcfe8', wallBot: '#f9a8d4', frame: '#9d174d', lit: ['#fef9c3', '#fce7f3', '#ffffff'], dark: '#831843', blind: '#f472b6' },
-      { wallTop: '#ddd6fe', wallBot: '#c4b5fd', frame: '#5b21b6', lit: ['#fef08a', '#ede9fe', '#ffffff'], dark: '#4c1d95', blind: '#a78bfa' },
-      { wallTop: '#fef08a', wallBot: '#fde047', frame: '#854d0e', lit: ['#ffffff', '#fef9c3', '#fffbeb'], dark: '#713f12', blind: '#eab308' },
-      { wallTop: '#e2e8f0', wallBot: '#94a3b8', frame: '#334155', lit: ['#fef08a', '#bae6fd', '#ffffff'], dark: '#1e293b', blind: '#64748b' },
-      { wallTop: '#a5f3fc', wallBot: '#67e8f9', frame: '#155e75', lit: ['#fef08a', '#ecfeff', '#ffffff'], dark: '#164e63', blind: '#22d3ee' },
-      { wallTop: '#fecaca', wallBot: '#fca5a5', frame: '#991b1b', lit: ['#fef9c3', '#fef2f2', '#ffffff'], dark: '#7f1d1d', blind: '#f87171' }
+const palettes = [
+      { wallTop: '#64748b', wallBot: '#475569', frame: '#1e293b', lit: ['#fde68a', '#fef3c7', '#cbd5e1'], dark: '#1e293b', blind: '#475569' },
+      { wallTop: '#9a3412', wallBot: '#7c2d12', frame: '#27272a', lit: ['#fde68a', '#fef3c7', '#cbd5e1'], dark: '#0f172a', blind: '#57534e' },
+      { wallTop: '#d6c7a1', wallBot: '#b8a67c', frame: '#3f3f46', lit: ['#fef3c7', '#fde68a', '#cbd5e1'], dark: '#1e293b', blind: '#78716c' },
+      { wallTop: '#cbd5e1', wallBot: '#94a3b8', frame: '#1e293b', lit: ['#fde68a', '#fef3c7', '#cbd5e1'], dark: '#0f172a', blind: '#64748b' },
+      { wallTop: '#475569', wallBot: '#334155', frame: '#0f172a', lit: ['#cbd5e1', '#fef3c7', '#fde68a'], dark: '#0f172a', blind: '#334155' },
+      { wallTop: '#c2593f', wallBot: '#9a3f29', frame: '#1e293b', lit: ['#fde68a', '#fef3c7', '#cbd5e1'], dark: '#1e293b', blind: '#64748b' },
+      { wallTop: '#e7dcc8', wallBot: '#cbbba0', frame: '#334155', lit: ['#fef3c7', '#fde68a', '#cbd5e1'], dark: '#0f172a', blind: '#78716c' },
+      { wallTop: '#3f3f46', wallBot: '#27272a', frame: '#09090b', lit: ['#fde68a', '#fef3c7', '#cbd5e1'], dark: '#0f172a', blind: '#52525b' },
+      { wallTop: '#6b705c', wallBot: '#525646', frame: '#1e293b', lit: ['#fef3c7', '#fde68a', '#cbd5e1'], dark: '#0f172a', blind: '#57534e' },
+      { wallTop: '#3b6e75', wallBot: '#2b5359', frame: '#0f172a', lit: ['#fde68a', '#fef3c7', '#cbd5e1'], dark: '#1e293b', blind: '#475569' }
     ];
 
     this._windowTextureCache = palettes.map((pal, pIdx) => {
@@ -384,9 +384,11 @@ _buildWindowTextures() {
     this._buildTrain();
     this._buildVehicleShop();
     this._buildNaturalHomes();
+    this._buildCityGardens();
     this._decorateBuildings();
     this._addStreetDetails();
     this._buildRoadDetails();
+    this._enhanceRoads();
     this._buildSkyDome();
     this._buildOpenWorld();
     this._buildPizzaShops();
@@ -697,6 +699,143 @@ _addNightGlow() {
       if (sp && sp.material) {
         sp.material.opacity = targetOpacity;
         sp.visible = targetOpacity > 0.02;
+      }
+    }
+  }
+
+_buildCityGardens() {
+    if (!this.cityGroup || !Array.isArray(this.blockCenters)) return;
+
+    const lawnMat = new THREE.MeshStandardMaterial({ color: 0x3f7d44, roughness: 0.9 });
+    const hedgeMat = new THREE.MeshStandardMaterial({ color: 0x2d5a2e, roughness: 0.85 });
+    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5c3a21, roughness: 0.88 });
+    const leafMat = new THREE.MeshStandardMaterial({ color: 0x3a733b, roughness: 0.8 });
+    const benchMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.72 });
+    const fenceMat = new THREE.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 0.65 });
+    const flowerMat = new THREE.MeshBasicMaterial({ color: 0xfde047 });
+
+    const lawnGeo = new THREE.PlaneGeometry(24, 24);
+    lawnGeo.rotateX(-Math.PI * 0.5);
+    const trunkGeo = new THREE.CylinderGeometry(0.18, 0.26, 2.5, 6);
+    const crownGeo = new THREE.ConeGeometry(1.5, 3.0, 6);
+    const hedgeGeo = new THREE.BoxGeometry(4.2, 1.0, 0.9);
+    const benchGeo = new THREE.BoxGeometry(1.6, 0.42, 0.55);
+    const flowerGeo = new THREE.BoxGeometry(0.4, 0.22, 0.4);
+    const fenceGeo = new THREE.BoxGeometry(18, 0.65, 0.12);
+
+    const maxIdx = Math.max(1, WORLD_CFG.blocksPerSide - 1);
+    let blocksBuilt = 0;
+
+    for (let i = 0; i < this.blockCenters.length && blocksBuilt < 120; i++) {
+      const b = this.blockCenters[i];
+      if ((this.pizzaBlockKeys && this.pizzaBlockKeys.has(i)) || (this.fuelBlockKeys && this.fuelBlockKeys.has(i))) continue;
+
+      const nx = b.bx / maxIdx;
+      const nz = b.bz / maxIdx;
+      const isBeach = nz > 0.72 && nx > 0.15 && nx < 0.85;
+      const isSuburbs = !isBeach && nx < 0.75 && nz < 0.85 && (b.bx + b.bz) % 2 === 0;
+      if (isBeach || isSuburbs) continue;
+      if ((b.bx + b.bz * 3) % 4 !== 0) continue;
+
+      const gx = clamp(b.x, b.x - 16, b.x + 16);
+      const gz = clamp(b.z, b.z - 16, b.z + 16);
+
+      const lawn = new THREE.Mesh(lawnGeo, lawnMat);
+      lawn.position.set(gx, WORLD_CFG.sidewalkHeight + 0.035, gz);
+      lawn.receiveShadow = true;
+      this.cityGroup.add(lawn);
+
+      for (const [tx, tz] of [
+        [-6.5, -5.5],
+        [6.5, 5.5]
+      ]) {
+        const cx = clamp(gx + tx, b.x - 16, b.x + 16);
+        const cz = clamp(gz + tz, b.z - 16, b.z + 16);
+        const tr = new THREE.Mesh(trunkGeo, trunkMat);
+        tr.position.set(cx, WORLD_CFG.sidewalkHeight + 1.25, cz);
+        tr.castShadow = true;
+        this.cityGroup.add(tr);
+
+        const cr = new THREE.Mesh(crownGeo, leafMat);
+        cr.position.set(cx, WORLD_CFG.sidewalkHeight + 3.6, cz);
+        cr.castShadow = true;
+        this.cityGroup.add(cr);
+      }
+
+      const hedge = new THREE.Mesh(hedgeGeo, hedgeMat);
+      hedge.position.set(gx, WORLD_CFG.sidewalkHeight + 0.5, clamp(gz - 7.5, b.z - 16, b.z + 16));
+      this.cityGroup.add(hedge);
+
+      const bench = new THREE.Mesh(benchGeo, benchMat);
+      bench.position.set(gx, WORLD_CFG.sidewalkHeight + 0.22, clamp(gz + 5.5, b.z - 16, b.z + 16));
+      this.cityGroup.add(bench);
+
+      const fl = new THREE.Mesh(flowerGeo, flowerMat);
+      fl.position.set(clamp(gx + 3.2, b.x - 16, b.x + 16), WORLD_CFG.sidewalkHeight + 0.14, clamp(gz + 5.5, b.z - 16, b.z + 16));
+      this.cityGroup.add(fl);
+
+      const fnc = new THREE.Mesh(fenceGeo, fenceMat);
+      fnc.position.set(gx, WORLD_CFG.sidewalkHeight + 0.35, clamp(gz + 10.5, b.z - 16, b.z + 16));
+      this.cityGroup.add(fnc);
+
+      blocksBuilt++;
+    }
+  }
+
+_enhanceRoads() {
+    if (!this.cityGroup || !Array.isArray(this.streetCoords) || this.streetCoords.length === 0) return;
+
+    const stopMat = new THREE.MeshBasicMaterial({ color: 0xf8fafc });
+    const patchMat = new THREE.MeshStandardMaterial({ color: 0x161b26, roughness: 0.94, metalness: 0.05 });
+    const curbMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.75 });
+    const arrowMat = new THREE.MeshBasicMaterial({ color: 0xe2e8f0 });
+
+    const stopLineGeo = new THREE.PlaneGeometry(4.2, 0.55);
+    stopLineGeo.rotateX(-Math.PI * 0.5);
+    const patchGeo = new THREE.PlaneGeometry(3.8, 2.4);
+    patchGeo.rotateX(-Math.PI * 0.5);
+    const curbStripGeo = new THREE.BoxGeometry(0.35, 0.14, 6.0);
+    const arrowGeo = new THREE.ConeGeometry(0.5, 1.35, 3);
+    arrowGeo.rotateX(-Math.PI * 0.5);
+
+    const roadW = WORLD_CFG.roadWidth || 14;
+    const halfRoad = roadW * 0.5;
+    let count = 0;
+    const cap = 300;
+
+    for (let i = 0; i < this.streetCoords.length && count < cap; i++) {
+      const s = this.streetCoords[i];
+
+      for (let j = 0; j < this.streetCoords.length && count < cap; j += 2) {
+        const ix = this.streetCoords[j];
+        const iz = s;
+
+        const stopLine = new THREE.Mesh(stopLineGeo, stopMat);
+        stopLine.position.set(ix - halfRoad * 0.45, 0.045, iz + halfRoad + 1.2);
+        this.cityGroup.add(stopLine);
+        count++;
+
+        if (count < cap) {
+          const patch = new THREE.Mesh(patchGeo, patchMat);
+          patch.position.set(ix + 10, 0.042, iz - halfRoad * 0.25);
+          patch.rotation.y = (i + j) * 0.4;
+          this.cityGroup.add(patch);
+          count++;
+        }
+      }
+
+      if (count < cap) {
+        const curb = new THREE.Mesh(curbStripGeo, curbMat);
+        curb.position.set(s + halfRoad + 0.18, 0.07, 8);
+        this.cityGroup.add(curb);
+        count++;
+      }
+
+      if (count < cap && i % 2 === 0) {
+        const arr = new THREE.Mesh(arrowGeo, arrowMat);
+        arr.position.set(s + halfRoad * 0.25, 0.046, 16);
+        this.cityGroup.add(arr);
+        count++;
       }
     }
   }
@@ -1682,6 +1821,7 @@ _buildGreenDistricts() {
     const wallMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.65 });
     const roofMat = new THREE.MeshStandardMaterial({ color: 0xb91c1c, roughness: 0.7 });
     const winMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+    const fenceMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.7 });
 
     const yardGeo = new THREE.PlaneGeometry(WORLD_CFG.blockSize - 3, WORLD_CFG.blockSize - 3);
     yardGeo.rotateX(-Math.PI * 0.5);
@@ -1704,8 +1844,11 @@ _buildGreenDistricts() {
       const nx = b.bx / maxIdx;
       const nz = b.bz / maxIdx;
 
+      const isReserved = (this.pizzaBlockKeys && this.pizzaBlockKeys.has(i)) || (this.fuelBlockKeys && this.fuelBlockKeys.has(i));
+      if (isReserved) continue;
+
       const isBeach = nz > 0.72 && nx > 0.15 && nx < 0.85;
-      const isSuburbs = !isBeach && nx < 0.45 && nz < 0.65 && (b.bx + b.bz) % 2 === 0;
+      const isSuburbs = !isBeach && nx < 0.75 && nz < 0.85 && (b.bx + b.bz) % 2 === 0;
       if (!isBeach && !isSuburbs) continue;
 
       const yard = new THREE.Mesh(yardGeo, isBeach ? sandMat : grassMat);
@@ -1713,6 +1856,26 @@ _buildGreenDistricts() {
       yard.receiveShadow = true;
       this.cityGroup.add(yard);
       placed++;
+
+      if (!isBeach) {
+        const halfPlot = 6.2;
+        const railH = 0.75;
+        for (const [fx, fz, fw, fd] of [
+          [0, -halfPlot, halfPlot * 2, 0.12],
+          [0, halfPlot, halfPlot * 2, 0.12],
+          [-halfPlot, 0, 0.12, halfPlot * 2],
+          [halfPlot, 0, 0.12, halfPlot * 2]
+        ]) {
+          if (placed >= 258) break;
+          const fenceRail = new THREE.Mesh(
+            new THREE.BoxGeometry(fw, railH, fd),
+            fenceMat
+          );
+          fenceRail.position.set(b.x + fx, WORLD_CFG.sidewalkHeight + railH * 0.5, b.z + fz);
+          this.cityGroup.add(fenceRail);
+          placed++;
+        }
+      }
 
       if (isBeach) {
         for (let p = 0; p < 3 && placed < 260; p++) {

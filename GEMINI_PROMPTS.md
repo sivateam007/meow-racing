@@ -279,6 +279,36 @@ multi-order chains work, rewards paid once, progress persists, zero console erro
 
 ---
 
+## Step 12 — NOS controls + professional city look
+
+> LABEL PATCH 1 — index.html — REPLACE `#touch-drift` with `#touch-nos` (label NOS);
+> ADD-ONLY `#hud-nitro` chip.
+>
+> LABEL PATCH 2 — config.js — REPLACE `INPUT.drift` with `INPUT.nos = ['Space','ShiftLeft']`.
+>
+> LABEL PATCH 3 — game.js — rename touchInput.drift to nos, generic touchMap id `touch-nos`,
+> `_readInput()` returns `nos`, idle input uses `nos:false`, `_updateHud()` writes `NOS n%`.
+>
+> LABEL PATCH 4 — car.js — ADD `this.nitro=100`; in `update()` drain 28/s while NOS held,
+> regen 9/s, `boosting` multiplies acceleration 1.9x and top speed 1.4x. Drift disabled.
+>
+> LABEL PATCH 5 — config.js — `blocksPerSide:16`, `fogDensity:0.0014`,
+> skyline 470–620 (outside new city).
+>
+> LABEL PATCH 6 — world.js — REPLACE facade palettes with realistic architectural tones
+> (concrete, brick, sandstone, limestone, glass, terracotta, cream, charcoal, stone, teal).
+>
+> LABEL PATCH 7 — world.js — widen `_buildGreenDistricts()` suburbs and add fenced yards;
+> ADD `_buildCityGardens()` and `_enhanceRoads()` with shared geometries, skip reserved
+> pizza/fuel blocks, call both from `buildCity()`.
+>
+> LABEL PATCH 8 — css/style.css — NOS button/gauge styling and subtle cinematic grading.
+
+**Acceptance:** NOS visibly boosts and drains/returns, HUD tracks nitro; facades look
+architectural not candy-coloured; more houses/gardens; extended city with no console errors.
+
+---
+
 ## Final validation checklist (run after every step)
 
 ```powershell

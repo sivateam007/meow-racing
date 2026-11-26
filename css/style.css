@@ -1022,3 +1022,12 @@ body::before {
 .hud-nitro-chip { border-color: #a855f7; color: #e9d5ff; font-weight: 900; }
 .hud-nitro-chip.active { border-color: #ef4444; color: #fecaca; animation: nitroPulse 1s ease-in-out infinite; }
 @keyframes nitroPulse { 50% { box-shadow: 0 0 16px rgba(239,68,68,.7); } }
+/* === CINEMATIC GRADING === */
+body::after {
+  background: radial-gradient(circle at center, rgba(255, 248, 231, 0.03) 56%, rgba(3, 6, 15, 0.52) 100%);
+}
+
+body::before {
+  background: linear-gradient(180deg, rgba(255, 244, 214, 0.06) 0%, rgba(15, 23, 42, 0.08) 100%);
+  filter: contrast(1.05) saturate(1.06);
+}

@@ -25,7 +25,7 @@ export const COLORS = {
 };
 
 export const WORLD_CFG = {
-  blocksPerSide: 14,
+  blocksPerSide: 16,
   blockSize: 44,
   roadWidth: 14,
   laneOffset: 3.4,
@@ -34,9 +34,9 @@ export const WORLD_CFG = {
   buildingMinHeight: 10,
   buildingMaxHeight: 42,
   skylineCount: 48,
-  skylineRadiusMin: 185,
-  skylineRadiusMax: 330,
-  fogDensity: 0.0018,
+  skylineRadiusMin: 470,
+  skylineRadiusMax: 620,
+  fogDensity: 0.0014,
   dayCycleDurationSec: 180,
   lightCycleDurationSec: 16,
   redLightRatio: 0.45,
