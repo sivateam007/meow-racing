@@ -255,6 +255,30 @@ multi-order chains work, rewards paid once, progress persists, zero console erro
 
 ---
 
+## Step 11 — Continuous delivery mode + night glow
+
+> LABEL PATCH 1 — game.js — REPLACE the `#touch-delivery` handler with a toggle:
+> `deliveryMode` on/off, toasts `DELIVERY MODE ON/OFF`.
+>
+> LABEL PATCH 2 — game.js — ADD `_startContinuousDelivery()`, `_stopContinuousDelivery()`,
+> `_updateContinuousDelivery(dt,carPos)` and `_continuousText(pos)`. Endless shop → dropoff →
+> next shop chain, tip from remaining time, `CityStorage.addCoins(tip)` and
+> `save({deliveriesCompleted})`. Fix double-count: `this.coins = CityStorage.get().coins`.
+>
+> LABEL PATCH 3 — game.js — call `_updateContinuousDelivery()` from `_loop()`.
+>
+> LABEL PATCH 4 — game.js — in `_updateHud()`, show `_continuousText()` in `#pizza-hud`
+> when `deliveryMode` is active; hide the chip when neither mode is active.
+>
+> LABEL PATCH 5 — world.js — ADD `_addNightGlow()` / `_updateNightGlow(dayLight)`:
+> additive sprites on lamp bulbs and neon/emissive meshes, capped at 180 for mobile FPS.
+> Call at end of `buildCity()` and inside `_updateDayNight()`.
+
+**Acceptance:** DELIVERY toggles endless orders, tips and counters persist, HUD shows
+`PIZZA SHOP 34m • 75s • $141`, night glow appears after dark, zero console errors.
+
+---
+
 ## Final validation checklist (run after every step)
 
 ```powershell

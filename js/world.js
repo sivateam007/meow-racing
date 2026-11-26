@@ -390,6 +390,7 @@ _buildWindowTextures() {
     this._buildSkyDome();
     this._buildOpenWorld();
     this._buildPizzaShops();
+    this._addNightGlow();
     this._clearRoadColliders();
   }
 
@@ -636,6 +637,67 @@ _buildWindowTextures() {
       group.add(ring);
       this.cityGroup.add(group);
       this.pizzaShops.push({ x: o.x, z: o.z + 5.5, outside: true });
+    }
+  }
+
+_addNightGlow() {
+    if (!this.cityGroup || typeof THREE === 'undefined') return;
+    if (Array.isArray(this.nightGlows)) {
+      for (let i = 0; i < this.nightGlows.length; i++) {
+        const g = this.nightGlows[i];
+        if (g && g.parent) g.parent.remove(g);
+      }
+    }
+    this.nightGlows = [];
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    const grad = ctx.createRadialGradient(32, 32, 2, 32, 32, 30);
+    grad.addColorStop(0, 'rgba(255, 248, 214, 0.95)');
+    grad.addColorStop(0.45, 'rgba(251, 191, 36, 0.42)');
+    grad.addColorStop(1, 'rgba(251, 191, 36, 0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 64, 64);
+
+    const glowTex = new THREE.CanvasTexture(canvas);
+    glowTex.colorSpace = THREE.SRGBColorSpace;
+
+    this.cityGroup.traverse((obj) => {
+      if (!obj || !obj.isMesh || !obj.material) return;
+      const mat = obj.material;
+      const hex = mat.color && typeof mat.color.getHex === 'function' ? mat.color.getHex() : 0;
+      const isBulb = mat.isMeshBasicMaterial && hex === 0xfef08a;
+      const isEmissive = Boolean(mat.emissive && typeof mat.emissive.getHex === 'function' && mat.emissive.getHex() !== 0x000000);
+      if (!isBulb && !isEmissive) return;
+
+      const spMat = new THREE.SpriteMaterial({
+        map: glowTex,
+        color: isBulb ? 0xfef08a : 0x7dd3fc,
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      });
+      const sprite = new THREE.Sprite(spMat);
+      sprite.scale.set(isBulb ? 5.5 : 6.5, isBulb ? 5.5 : 6.5, 1);
+      obj.add(sprite);
+      if (this.nightGlows.length >= 180) { obj.remove(sprite); return; }
+      this.nightGlows.push(sprite);
+    });
+  }
+
+  _updateNightGlow(dayLight = 1) {
+    if (!Array.isArray(this.nightGlows) || this.nightGlows.length === 0) return;
+    const dl = clamp(dayLight, 0, 1);
+    const targetOpacity = lerp(0.85, 0, dl);
+    for (let i = 0; i < this.nightGlows.length; i++) {
+      const sp = this.nightGlows[i];
+      if (sp && sp.material) {
+        sp.material.opacity = targetOpacity;
+        sp.visible = targetOpacity > 0.02;
+      }
     }
   }
 
@@ -1241,6 +1303,7 @@ _buildWindowTextures() {
     const daylight = 0.5 + 0.5 * Math.cos(this.lightPhase * Math.PI * 2);
     const dayBoost = this.time < cycle * 0.5 ? 0.35 : 0;
     const dayLight = Math.min(1, daylight + dayBoost);
+    this._updateNightGlow(dayLight);
 
     const sunset = Math.max(0, 1 - Math.abs(dayLight - 0.36) / 0.28);
     const topCol = new THREE.Color(COLORS.skyNightTop).lerp(new THREE.Color(COLORS.skyDayTop), dayLight);

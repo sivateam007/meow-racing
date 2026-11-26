@@ -1015,3 +1015,4 @@ body::before {
 .shop-colors-label { font-size:10px; font-weight:900; letter-spacing:.08em; color:#94a3b8; }
 .color-swatch { width:28px; height:28px; min-width:28px; border-radius:50%; border:2px solid rgba(255,255,255,.45); cursor:pointer; }
 .color-swatch.active { border-color:#38bdf8; box-shadow:0 0 10px rgba(56,189,248,.7); }
+/* Night glow sprites in Three.js are additive and already mobile-landscape safe without extra CSS overrides. */
