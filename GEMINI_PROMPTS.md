@@ -309,6 +309,31 @@ architectural not candy-coloured; more houses/gardens; extended city with no con
 
 ---
 
+## Step 13 — Realistic materials, night windows and cinematic sky
+
+> LABEL PATCH 1 — world.js — store `this.groundMat`, `this.cityPadMat`, `this.sidewalkMat`
+> when creating those materials (declare the store AFTER `sidewalkMat`).
+>
+> LABEL PATCH 2 — world.js — ADD `_applySurfaceMaterials()`: procedural asphalt + pavement
+> canvas textures with repeat wrapping, bump map for asphalt, assign to stored materials.
+>
+> LABEL PATCH 3 — world.js — building materials get `emissive:0xffffff`, `emissiveMap:tex`,
+> `emissiveIntensity:0`, pushed to `this._buildingMats`; `_updateDayNight()` sets intensity
+> `lerp(0.85,0,dayLight)` so windows light up at night.
+>
+> LABEL PATCH 4 — world.js — sky shader gets `horizonColor` and `sunDir` uniforms, three-stop
+> gradient plus soft sun glow; update both colours in `_updateDayNight()`.
+>
+> LABEL PATCH 5 — world.js — ADD `_addGroundAO()`: capped fake contact shadows under tall
+> buildings using one shared radial gradient material.
+>
+> LABEL PATCH 6 — css/style.css — subtle film-grain overlay via data-URI SVG noise.
+
+**Acceptance:** textured roads/pavement, windows glow at night, horizon gradient + sun glow,
+no shader errors, mobile FPS acceptable.
+
+---
+
 ## Final validation checklist (run after every step)
 
 ```powershell

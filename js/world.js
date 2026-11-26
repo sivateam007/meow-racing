@@ -164,6 +164,7 @@ const palettes = [
     groundMesh.position.y = -0.5;
     groundMesh.receiveShadow = true;
     this.cityGroup.add(groundMesh);
+    this.groundMat = groundMat;
 
     const cityPad = new THREE.Mesh(
       new THREE.PlaneGeometry(WORLD_CFG.gridSpan + 40, WORLD_CFG.gridSpan + 40),
@@ -173,6 +174,7 @@ const palettes = [
     cityPad.position.y = 0;
     cityPad.receiveShadow = true;
     this.cityGroup.add(cityPad);
+    this.cityPadMat = cityPad.material;
 
     const stripeMat = new THREE.MeshBasicMaterial({ color: COLORS.laneLine });
     const edgeMat = new THREE.MeshBasicMaterial({ color: COLORS.roadEdge });
@@ -182,6 +184,7 @@ const palettes = [
       roughness: 0.82,
       metalness: 0.05
     });
+    this.sidewalkMat = sidewalkMat;
 
     const dashGeo = new THREE.PlaneGeometry(0.22, 4.2);
     dashGeo.rotateX(-Math.PI * 0.5);
@@ -281,6 +284,7 @@ const palettes = [
         .filter((i) => !this.pizzaBlockKeys.has(i))
     );
 
+    this._buildingMats = [];
     const houseRoofMat = new THREE.MeshStandardMaterial({ color: 0xb91c1c, roughness: 0.8 });
     const gableGeo = new THREE.BoxGeometry(1, 0.3, 1);
 
@@ -341,8 +345,12 @@ const palettes = [
         const bldgMat = new THREE.MeshStandardMaterial({
           map: tex,
           roughness: 0.45,
-          metalness: 0.25
+          metalness: 0.25,
+          emissive: 0xffffff,
+          emissiveMap: tex,
+          emissiveIntensity: 0
         });
+        if (Array.isArray(this._buildingMats)) this._buildingMats.push(bldgMat);
         const bldgMesh = new THREE.Mesh(
           new THREE.BoxGeometry(fp.w, height, fp.d),
           bldgMat
@@ -385,10 +393,12 @@ const palettes = [
     this._buildVehicleShop();
     this._buildNaturalHomes();
     this._buildCityGardens();
+    this._addGroundAO();
     this._decorateBuildings();
     this._addStreetDetails();
     this._buildRoadDetails();
     this._enhanceRoads();
+    this._applySurfaceMaterials();
     this._buildSkyDome();
     this._buildOpenWorld();
     this._buildPizzaShops();
@@ -837,6 +847,137 @@ _enhanceRoads() {
         this.cityGroup.add(arr);
         count++;
       }
+    }
+  }
+
+_applySurfaceMaterials() {
+    if (typeof THREE === 'undefined') return;
+
+    const aCanvas = document.createElement('canvas');
+    aCanvas.width = 128;
+    aCanvas.height = 128;
+    const aCtx = aCanvas.getContext('2d');
+    aCtx.fillStyle = '#252a36';
+    aCtx.fillRect(0, 0, 128, 128);
+
+    for (let i = 0; i < 900; i++) {
+      const x = (i * 37) % 128;
+      const y = (i * 73) % 128;
+      const v = 24 + (i % 28);
+      aCtx.fillStyle = `rgb(${v},${v + 2},${v + 6})`;
+      aCtx.fillRect(x, y, 2, 2);
+    }
+
+    aCtx.strokeStyle = 'rgba(10, 13, 20, 0.55)';
+    aCtx.lineWidth = 1;
+    for (let c = 0; c < 6; c++) {
+      aCtx.beginPath();
+      const sx = (c * 23) % 120;
+      const sy = (c * 41) % 110;
+      aCtx.moveTo(sx, sy);
+      aCtx.lineTo(sx + 10, sy + 7);
+      aCtx.lineTo(sx + 18, sy + 5);
+      aCtx.stroke();
+    }
+
+    const asphaltTex = new THREE.CanvasTexture(aCanvas);
+    asphaltTex.wrapS = THREE.RepeatWrapping;
+    asphaltTex.wrapT = THREE.RepeatWrapping;
+    asphaltTex.repeat.set(42, 42);
+    asphaltTex.colorSpace = THREE.SRGBColorSpace;
+
+    const asphaltBump = new THREE.CanvasTexture(aCanvas);
+    asphaltBump.wrapS = THREE.RepeatWrapping;
+    asphaltBump.wrapT = THREE.RepeatWrapping;
+    asphaltBump.repeat.set(42, 42);
+
+    const pCanvas = document.createElement('canvas');
+    pCanvas.width = 128;
+    pCanvas.height = 128;
+    const pCtx = pCanvas.getContext('2d');
+    pCtx.fillStyle = '#94a3b8';
+    pCtx.fillRect(0, 0, 128, 128);
+    pCtx.strokeStyle = 'rgba(30, 41, 59, 0.45)';
+    pCtx.lineWidth = 2;
+    for (let g = 0; g <= 128; g += 32) {
+      pCtx.beginPath();
+      pCtx.moveTo(g, 0);
+      pCtx.lineTo(g, 128);
+      pCtx.stroke();
+
+      pCtx.beginPath();
+      pCtx.moveTo(0, g);
+      pCtx.lineTo(128, g);
+      pCtx.stroke();
+    }
+
+    const pavementTex = new THREE.CanvasTexture(pCanvas);
+    pavementTex.wrapS = THREE.RepeatWrapping;
+    pavementTex.wrapT = THREE.RepeatWrapping;
+    pavementTex.repeat.set(36, 36);
+    pavementTex.colorSpace = THREE.SRGBColorSpace;
+
+    for (const mat of [this.groundMat, this.cityPadMat]) {
+      if (mat) {
+        mat.map = asphaltTex;
+        mat.bumpMap = asphaltBump;
+        mat.bumpScale = 0.04;
+        mat.roughness = 0.95;
+        mat.metalness = 0.02;
+        mat.needsUpdate = true;
+      }
+    }
+
+    if (this.sidewalkMat) {
+      this.sidewalkMat.map = pavementTex;
+      this.sidewalkMat.roughness = 0.85;
+      this.sidewalkMat.metalness = 0.02;
+      this.sidewalkMat.needsUpdate = true;
+    }
+  }
+// Note: Call this._applySurfaceMaterials() inside buildCity() right after this._enhanceRoads().
+
+_addGroundAO() {
+    if (!this.cityGroup || typeof THREE === 'undefined') return;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    const grad = ctx.createRadialGradient(32, 32, 6, 32, 32, 31);
+    grad.addColorStop(0, 'rgba(2, 6, 23, 0.52)');
+    grad.addColorStop(0.65, 'rgba(2, 6, 23, 0.22)');
+    grad.addColorStop(1, 'rgba(2, 6, 23, 0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 64, 64);
+
+    const aoTex = new THREE.CanvasTexture(canvas);
+    aoTex.colorSpace = THREE.SRGBColorSpace;
+
+    const aoMat = new THREE.MeshBasicMaterial({
+      map: aoTex,
+      transparent: true,
+      opacity: 0.72,
+      depthWrite: false
+    });
+    const aoGeo = new THREE.PlaneGeometry(10, 10);
+    aoGeo.rotateX(-Math.PI * 0.5);
+
+    const targets = [];
+    this.cityGroup.traverse((obj) => {
+      if (!obj || !obj.isMesh || !obj.geometry || !obj.geometry.parameters) return;
+      const h = obj.geometry.parameters.height;
+      if (typeof h === 'number' && h >= 12) {
+        targets.push(obj);
+      }
+    });
+
+    const limit = Math.min(targets.length, 180);
+    for (let i = 0; i < limit; i++) {
+      const bldg = targets[i];
+      const pad = new THREE.Mesh(aoGeo, aoMat);
+      pad.position.set(0, 0.05, 0);
+      bldg.add(pad);
     }
   }
 
@@ -1442,6 +1583,9 @@ _enhanceRoads() {
     const daylight = 0.5 + 0.5 * Math.cos(this.lightPhase * Math.PI * 2);
     const dayBoost = this.time < cycle * 0.5 ? 0.35 : 0;
     const dayLight = Math.min(1, daylight + dayBoost);
+    if (Array.isArray(this._buildingMats)) {
+      for (const m of this._buildingMats) { if (m) m.emissiveIntensity = lerp(0.85, 0.0, dayLight); }
+    }
     this._updateNightGlow(dayLight);
 
     const sunset = Math.max(0, 1 - Math.abs(dayLight - 0.36) / 0.28);
@@ -1457,6 +1601,8 @@ _enhanceRoads() {
       this.scene.fog.color.copy(fogCol);
     }
     if (this._skyUniforms) {
+      if (this._skyUniforms.horizonColor) { this._skyUniforms.horizonColor.value.copy(new THREE.Color(COLORS.skyNightHorizon ?? COLORS.fogNight ?? 0x0f172a)).lerp(new THREE.Color(COLORS.skyDayHorizon ?? COLORS.fogDay ?? 0x93c5fd), dayLight); }
+      if (this._skyUniforms.sunDir && this.sunLight) { this._skyUniforms.sunDir.value.copy(this.sunLight.position).normalize(); }
       if (this._skyUniforms.topColor) this._skyUniforms.topColor.value.copy(topCol);
       if (this._skyUniforms.bottomColor) this._skyUniforms.bottomColor.value.copy(fogCol);
     }
@@ -1579,7 +1725,9 @@ _enhanceRoads() {
       depthWrite: false,
       uniforms: {
         topColor: { value: topCol },
-        bottomColor: { value: botCol }
+        bottomColor: { value: botCol },
+        horizonColor: { value: new THREE.Color(COLORS.skyDayHorizon ?? COLORS.fogDay ?? 0x93c5fd) },
+        sunDir: { value: new THREE.Vector3(0.4, 0.7, 0.5).normalize() }
       },
       vertexShader: `
         varying vec3 vWorldPos;
@@ -1591,11 +1739,17 @@ _enhanceRoads() {
       `,
       fragmentShader: `
         uniform vec3 topColor;
+        uniform vec3 horizonColor;
         uniform vec3 bottomColor;
+        uniform vec3 sunDir;
         varying vec3 vWorldPos;
         void main() {
-          float h = clamp(normalize(vWorldPos).y * 1.4, 0.0, 1.0);
-          vec3 col = mix(bottomColor, topColor, pow(h, 0.65));
+          vec3 dir = normalize(vWorldPos);
+          float h = clamp(dir.y * 1.4, 0.0, 1.0);
+          vec3 lowToMid = mix(bottomColor, horizonColor, smoothstep(0.0, 0.35, h));
+          vec3 col = mix(lowToMid, topColor, smoothstep(0.35, 1.0, h));
+          float sunAmt = max(dot(dir, normalize(sunDir)), 0.0);
+          col += vec3(1.0, 0.86, 0.62) * pow(sunAmt, 12.0) * 0.28;
           gl_FragColor = vec4(col, 1.0);
         }
       `
