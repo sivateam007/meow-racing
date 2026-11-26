@@ -149,17 +149,21 @@
     </div>
   </div>
 
-  <div class="touch-controls">
-    <div class="touch-group-left">
-      <button id="touch-left" class="touch-btn touch-steer" type="button" aria-label="Steer Left">L</button>
-      <button id="touch-right" class="touch-btn touch-steer" type="button" aria-label="Steer Right">R</button>
+<div class="touch-controls">
+  <div class="touch-group-left drive-pod drive-pod-left">
+    <div class="steering-ring">
+      <button id="touch-left" class="touch-btn touch-steer" type="button" aria-label="Steer Left">◀</button>
+      <button id="touch-right" class="touch-btn touch-steer" type="button" aria-label="Steer Right">▶</button>
     </div>
-    <div class="touch-group-right">
+  </div>
+  <div class="touch-group-right drive-pod drive-pod-right">
+    <div class="pedal-cluster">
       <button id="touch-nos" class="touch-btn touch-nos" type="button" aria-label="Nitro Boost">NOS</button>
       <button id="touch-brake" class="touch-btn touch-brake" type="button" aria-label="Brake or Reverse">REV</button>
       <button id="touch-gas" class="touch-btn touch-gas" type="button" aria-label="Accelerate">GAS</button>
     </div>
   </div>
+</div>
 
   <div id="menu-overlay" class="overlay">
     <div class="overlay-card">
@@ -187,6 +191,7 @@
   <div id="help-panel" class="overlay hidden">
     <div class="overlay-card">
       <h2 class="pause-title">CONTROLS &amp; GUIDE</h2>
+      <p id="control-hint" class="game-subtitle">Left pod steers (◀/▶); right pod controls GAS, REV, and NOS boost.</p>
       <p class="game-subtitle">
         Drive: W/A/S/D or Arrows • Drift: Space • Taxi: T • Shop: B • Pause: P.<br />
         Refuel at the Oil Co station, pick up pedestrians for fares, and unlock vehicles in the shop.

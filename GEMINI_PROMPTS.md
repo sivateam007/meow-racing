@@ -334,6 +334,29 @@ no shader errors, mobile FPS acceptable.
 
 ---
 
+## Step 14 — Professional mobile control layout
+
+> LABEL PATCH 1 — index.html — REPLACE `.touch-controls` with two ergonomic pods:
+> `.drive-pod-left` containing `.steering-ring` with #touch-left/#touch-right (◀/▶),
+> and `.drive-pod-right` containing `.pedal-cluster` with #touch-nos (pill), #touch-brake, #touch-gas.
+> All IDs preserved (game.js touchMap binds by ID).
+>
+> LABEL PATCH 2 — css/style.css — glassmorphic pods with backdrop blur, CSS size variables,
+> 78px steering buttons, 92px GAS gradient, 68px REV, NOS pill, pressed scale/glow states.
+>
+> LABEL PATCH 3 — css/style.css — landscape + safe-area responsive scaling, pods never overlap HUD.
+>
+> LABEL PATCH 4 — css/style.css — `body[data-layout]` presets scale pods via CSS variables.
+>
+> LABEL PATCH 5 — css/style.css — HUD action buttons get compact pill styling with category dots.
+>
+> LABEL PATCH 6 — index.html — add `#control-hint` to HELP panel.
+
+**Acceptance:** left thumb steers, right thumb uses pedals/NOS; no overlap with minimap or
+HUD chips; SPD label stays on one line; zero console errors.
+
+---
+
 ## Final validation checklist (run after every step)
 
 ```powershell
