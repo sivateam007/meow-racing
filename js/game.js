@@ -49,7 +49,6 @@ export class Game {
       gas: false,
       brake: false,
       nos: false,
-      steer: 0
     };
 
     this._initScene();
@@ -299,58 +298,7 @@ export class Game {
       });
     });
 
-    const steerSlider = document.getElementById('steer-slider');
-    const steerKnob = document.getElementById('steer-knob');
-    if (steerSlider) {
-  let activePointerId = null;
-  const updateSlider = (clientX) => {
-    const rect = steerSlider.getBoundingClientRect();
-    const width = Math.max(1, rect.width);
-    const norm = clamp(((clientX - rect.left) / width) * 2 - 1, -1, 1);
-    if (this.touchInput) {
-      this.touchInput.steer = norm;
-    }
-    if (steerKnob) {
-      const pct = norm * 42;
-      steerKnob.style.transform = `translateX(${pct}%)`;
-    }
-  };
-  const resetSlider = () => {
-    activePointerId = null;
-    if (this.touchInput) {
-      this.touchInput.steer = 0;
-    }
-    if (steerKnob) {
-      steerKnob.style.transform = 'translateX(0%)';
-    }
-  };
 
-  steerSlider.addEventListener('pointerdown', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    activePointerId = e.pointerId;
-    steerSlider.setPointerCapture?.(e.pointerId);
-    steerSlider.classList.add('active');
-    updateSlider(e.clientX);
-  });
-  steerSlider.addEventListener('pointermove', (e) => {
-    if (activePointerId !== e.pointerId) return;
-    e.preventDefault();
-    e.stopPropagation();
-    updateSlider(e.clientX);
-  });
-  steerSlider.addEventListener('pointerup', (e) => {
-    if (activePointerId !== e.pointerId) return;
-    e.preventDefault();
-    e.stopPropagation();
-    steerSlider.classList.remove('active');
-    resetSlider();
-  });
-  steerSlider.addEventListener('pointercancel', () => {
-    steerSlider.classList.remove('active');
-    resetSlider();
-  });
-}
 
     const missionBtn = document.getElementById('touch-missions');
     if (missionBtn) {
@@ -589,8 +537,7 @@ export class Game {
       backward,
       left,
       right,
-      nos,
-      steer: this.touchInput.steer || 0
+      nos
     };
   }
 
