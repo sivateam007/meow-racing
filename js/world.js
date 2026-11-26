@@ -402,7 +402,6 @@ const palettes = [
     this._enhanceRoads();
     this._applySurfaceMaterials();
     this._addEnvironmentReflections();
-    this._addRainSystem();
     this._buildSkyDome();
     this._addSkyClouds();
     this._buildOpenWorld();
@@ -1276,57 +1275,6 @@ _addSkyClouds() {
     }
   }
 
-_addRainSystem() {
-    if (!this.scene || typeof THREE === 'undefined') return;
-    if (this.rain && this.rain.parent) {
-      this.scene.remove(this.rain);
-    }
-
-    const count = 350;
-    const positions = new Float32Array(count * 3);
-    const spanX = 90;
-    const spanZ = 90;
-    const spanY = 38;
-
-    for (let i = 0; i < count; i++) {
-      positions[i * 3] = (((i * 73) % 1000) / 1000 - 0.5) * spanX;
-      positions[i * 3 + 1] = (((i * 197) % 1000) / 1000) * spanY;
-      positions[i * 3 + 2] = (((i * 311) % 1000) / 1000 - 0.5) * spanZ;
-    }
-
-    const rCanvas = document.createElement('canvas');
-    rCanvas.width = 16;
-    rCanvas.height = 64;
-    const rCtx = rCanvas.getContext('2d');
-    const grad = rCtx.createLinearGradient(0, 0, 0, 64);
-    grad.addColorStop(0, 'rgba(186, 230, 253, 0)');
-    grad.addColorStop(0.5, 'rgba(186, 230, 253, 0.75)');
-    grad.addColorStop(1, 'rgba(186, 230, 253, 0)');
-    rCtx.fillStyle = grad;
-    rCtx.fillRect(6, 4, 4, 56);
-
-    const rainTex = new THREE.CanvasTexture(rCanvas);
-    rainTex.colorSpace = THREE.SRGBColorSpace;
-
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-
-    const mat = new THREE.PointsMaterial({
-      map: rainTex,
-      color: 0xbae6fd,
-      size: 1.35,
-      transparent: true,
-      opacity: 0.55,
-      depthWrite: false
-    });
-
-    const points = new THREE.Points(geo, mat);
-    points.visible = false;
-    points.frustumCulled = false;
-    this.rain = points;
-    this.scene.add(points);
-  }
-
 _addEnvironmentReflections() {
     if (typeof THREE === 'undefined') return;
 
@@ -2127,22 +2075,6 @@ const skinColors = [0xf1c27d, 0xe0ac69, 0x8d5524, 0xc68642, 0xffdbac];
     this._updateTrain(safeDt);
     this._updateTaxiMarker(safeDt);
     this._updateOpenWorld(playerPos);
-    if (this.rain) {
-      const ph = ((this.lightPhase || 0) % 1 + 1) % 1;
-      const dl = 0.5 + 0.5 * Math.cos(ph * Math.PI * 2);
-      const rDt = Math.min(dt || 0.016, 0.05);
-      this.rain.visible = dl < 0.25;
-      if (this.rain.visible) {
-        this.rain.position.set(playerPos.x || 0, 0, playerPos.z || 0);
-        const p = this.rain.geometry.attributes.position;
-        for (let ri = 0; ri < p.count; ri++) {
-          let yy = p.getY(ri) - 36 * rDt;
-          if (yy < 0) yy += 38;
-          p.setY(ri, yy);
-        }
-        p.needsUpdate = true;
-      }
-    }
   }
 
   _buildRoadDetails() {
