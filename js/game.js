@@ -1601,16 +1601,38 @@ _updateMinimap() {
     const span = (typeof WORLD_CFG !== 'undefined' && WORLD_CFG.gridSpan) ? WORLD_CFG.gridSpan : 1100;
     const halfSpan = span * 0.5;
 
-    const toX = (wx) => ((wx + halfSpan) / span) * w;
-    const toY = (wz) => ((wz + halfSpan) / span) * h;
+    const carPos = this.car && typeof this.car.getPosition === 'function'
+      ? this.car.getPosition() : { x: 0, z: 0 };
+    const outsideCity = Math.abs(carPos.x || 0) > halfSpan || Math.abs(carPos.z || 0) > halfSpan;
+    const viewSpan = outsideCity ? 420 : span;
+    const viewX = outsideCity ? (carPos.x || 0) : 0;
+    const viewZ = outsideCity ? (carPos.z || 0) : 0;
+    const toX = (wx) => ((wx - viewX) / viewSpan + 0.5) * w;
+    const toY = (wz) => ((wz - viewZ) / viewSpan + 0.5) * h;
 
     ctx.clearRect(0, 0, w, h);
-    ctx.fillStyle = '#0b1220';
+    ctx.fillStyle = outsideCity ? '#0d2218' : '#0b1220';
     ctx.fillRect(0, 0, w, h);
+
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.55)';
+    ctx.lineWidth = 1.2;
+    ctx.strokeRect(toX(-halfSpan), toY(-halfSpan), (span / viewSpan) * w, (span / viewSpan) * h);
+
+    if (outsideCity && this.world && Array.isArray(this.world.openWorldProps)) {
+      ctx.fillStyle = 'rgba(74, 222, 128, 0.65)';
+      for (const prop of this.world.openWorldProps) {
+        if (!prop || !prop.group) continue;
+        const p = prop.group.position;
+        const px = toX(p.x);
+        const py = toY(p.z);
+        if (px < 0 || px > w || py < 0 || py > h) continue;
+        ctx.fillRect(px - 1, py - 1, 2, 2);
+      }
+    }
 
     // Block outlines
     if (this.world && Array.isArray(this.world.blockCenters) && typeof WORLD_CFG !== 'undefined') {
-      const bw = Math.max(2, ((WORLD_CFG.blockSize || 50) / span) * w);
+      const bw = Math.max(2, ((WORLD_CFG.blockSize || 50) / viewSpan) * w);
       ctx.fillStyle = 'rgba(30, 41, 59, 0.72)';
       ctx.strokeStyle = 'rgba(71, 85, 105, 0.45)';
       ctx.lineWidth = 0.7;
@@ -1626,7 +1648,7 @@ _updateMinimap() {
 
     // Street grid
     if (this.world && Array.isArray(this.world.streetCoords)) {
-      const roadPx = Math.max(1.5, ((WORLD_CFG.roadWidth || 14) / span) * w);
+      const roadPx = Math.max(1.5, ((WORLD_CFG.roadWidth || 14) / viewSpan) * w);
       ctx.strokeStyle = '#334155';
       ctx.lineWidth = roadPx;
       for (let i = 0; i < this.world.streetCoords.length; i++) {
@@ -1721,7 +1743,6 @@ _updateMinimap() {
       ringColor = '#38bdf8';
     }
 
-    const carPos = this.car && typeof this.car.getPosition === 'function' ? this.car.getPosition() : { x: 0, z: 0 };
     const carHeading = this.car && typeof this.car.getHeading === 'function' ? this.car.getHeading() : 0;
     const playerX = toX(carPos.x || 0);
     const playerY = toY(carPos.z || 0);
