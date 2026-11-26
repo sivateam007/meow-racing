@@ -401,7 +401,10 @@ const palettes = [
     this._buildRoadDetails();
     this._enhanceRoads();
     this._applySurfaceMaterials();
+    this._addEnvironmentReflections();
+    this._addRainSystem();
     this._buildSkyDome();
+    this._addSkyClouds();
     this._buildOpenWorld();
     this._buildPizzaShops();
     this._buildStarkTower();
@@ -1205,6 +1208,173 @@ _enhanceStreetTrees() {
     }
   }
 
+_addSkyClouds() {
+    if (!this._skyDomeGroup || typeof THREE === 'undefined') return;
+
+    if (Array.isArray(this._cloudSprites)) {
+      for (let i = 0; i < this._cloudSprites.length; i++) {
+        const sp = this._cloudSprites[i];
+        if (sp && sp.parent) sp.parent.remove(sp);
+      }
+    }
+    this._cloudSprites = [];
+
+    const existingSprite = this._skyDomeGroup.children.find((c) => c && c.isSprite && c.material && c.material.map);
+    let cloudTex = existingSprite ? existingSprite.material.map : null;
+
+    if (!cloudTex) {
+      const cCanvas = document.createElement('canvas');
+      cCanvas.width = 128;
+      cCanvas.height = 128;
+      const cCtx = cCanvas.getContext('2d');
+      const grad = cCtx.createRadialGradient(64, 64, 8, 64, 64, 62);
+      grad.addColorStop(0, 'rgba(255, 255, 255, 0.58)');
+      grad.addColorStop(0.6, 'rgba(255, 255, 255, 0.24)');
+      grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+      cCtx.fillStyle = grad;
+      cCtx.fillRect(0, 0, 128, 128);
+      cloudTex = new THREE.CanvasTexture(cCanvas);
+      cloudTex.colorSpace = THREE.SRGBColorSpace;
+    }
+
+    for (let i = this._skyDomeGroup.children.length - 1; i >= 0; i--) {
+      const ch = this._skyDomeGroup.children[i];
+      if (ch && ch.isSprite) {
+        this._skyDomeGroup.remove(ch);
+      }
+    }
+
+    const sharedMat = new THREE.SpriteMaterial({
+      map: cloudTex,
+      transparent: true,
+      opacity: 0.5,
+      depthWrite: false,
+      fog: false
+    });
+
+    const configs = [
+      [-160, 122, -110, 74, 28],
+      [-55, 134, -145, 86, 32],
+      [65, 128, -125, 70, 26],
+      [155, 140, -90, 92, 34],
+      [-135, 118, 45, 68, 25],
+      [-25, 136, 85, 82, 30],
+      [85, 124, 65, 76, 28],
+      [165, 138, 115, 88, 32],
+      [-90, 144, 155, 78, 29],
+      [25, 120, -40, 64, 24]
+    ];
+
+    for (let i = 0; i < configs.length; i++) {
+      const [cx, cy, cz, sx, sy] = configs[i];
+      const sp = new THREE.Sprite(sharedMat);
+      sp.position.set(cx, cy, cz);
+      sp.scale.set(sx, sy, 1);
+      sp.renderOrder = -1;
+      this._skyDomeGroup.add(sp);
+      this._cloudSprites.push(sp);
+    }
+  }
+
+_addRainSystem() {
+    if (!this.scene || typeof THREE === 'undefined') return;
+    if (this.rain && this.rain.parent) {
+      this.scene.remove(this.rain);
+    }
+
+    const count = 350;
+    const positions = new Float32Array(count * 3);
+    const spanX = 90;
+    const spanZ = 90;
+    const spanY = 38;
+
+    for (let i = 0; i < count; i++) {
+      positions[i * 3] = (((i * 73) % 1000) / 1000 - 0.5) * spanX;
+      positions[i * 3 + 1] = (((i * 197) % 1000) / 1000) * spanY;
+      positions[i * 3 + 2] = (((i * 311) % 1000) / 1000 - 0.5) * spanZ;
+    }
+
+    const rCanvas = document.createElement('canvas');
+    rCanvas.width = 16;
+    rCanvas.height = 64;
+    const rCtx = rCanvas.getContext('2d');
+    const grad = rCtx.createLinearGradient(0, 0, 0, 64);
+    grad.addColorStop(0, 'rgba(186, 230, 253, 0)');
+    grad.addColorStop(0.5, 'rgba(186, 230, 253, 0.75)');
+    grad.addColorStop(1, 'rgba(186, 230, 253, 0)');
+    rCtx.fillStyle = grad;
+    rCtx.fillRect(6, 4, 4, 56);
+
+    const rainTex = new THREE.CanvasTexture(rCanvas);
+    rainTex.colorSpace = THREE.SRGBColorSpace;
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+    const mat = new THREE.PointsMaterial({
+      map: rainTex,
+      color: 0xbae6fd,
+      size: 1.35,
+      transparent: true,
+      opacity: 0.55,
+      depthWrite: false
+    });
+
+    const points = new THREE.Points(geo, mat);
+    points.visible = false;
+    points.frustumCulled = false;
+    this.rain = points;
+    this.scene.add(points);
+  }
+
+_addEnvironmentReflections() {
+    if (typeof THREE === 'undefined') return;
+
+    const makeFace = (topHex, botHex) => {
+      const c = document.createElement('canvas');
+      c.width = 64;
+      c.height = 64;
+      const ctx = c.getContext('2d');
+      const g = ctx.createLinearGradient(0, 0, 0, 64);
+      g.addColorStop(0, topHex);
+      g.addColorStop(1, botHex);
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, 64, 64);
+      return c;
+    };
+
+    const px = makeFace('#7dd3fc', '#334155');
+    const nx = makeFace('#7dd3fc', '#334155');
+    const py = makeFace('#bae6fd', '#38bdf8');
+    const ny = makeFace('#1e293b', '#0f172a');
+    const pz = makeFace('#93c5fd', '#475569');
+    const nz = makeFace('#93c5fd', '#475569');
+
+    const envTex = new THREE.CubeTexture([px, nx, py, ny, pz, nz]);
+    envTex.colorSpace = THREE.SRGBColorSpace;
+    envTex.needsUpdate = true;
+    this._envMap = envTex;
+
+    if (Array.isArray(this._buildingMats)) {
+      for (let i = 0; i < this._buildingMats.length; i++) {
+        const m = this._buildingMats[i];
+        if (m) {
+          m.envMap = envTex;
+          m.envMapIntensity = 0.35;
+          m.needsUpdate = true;
+        }
+      }
+    }
+
+    for (const mat of [this.groundMat, this.cityPadMat]) {
+      if (mat) {
+        mat.envMap = envTex;
+        mat.envMapIntensity = 0.1;
+        mat.needsUpdate = true;
+      }
+    }
+  }
+
   _clearRoadColliders() {
     const half = (WORLD_CFG.roadWidth || 14) * 0.5 + 0.5;
     const streets = Array.isArray(this.streetCoords) ? this.streetCoords : [];
@@ -1957,6 +2127,22 @@ const skinColors = [0xf1c27d, 0xe0ac69, 0x8d5524, 0xc68642, 0xffdbac];
     this._updateTrain(safeDt);
     this._updateTaxiMarker(safeDt);
     this._updateOpenWorld(playerPos);
+    if (this.rain) {
+      const ph = ((this.lightPhase || 0) % 1 + 1) % 1;
+      const dl = 0.5 + 0.5 * Math.cos(ph * Math.PI * 2);
+      const rDt = Math.min(dt || 0.016, 0.05);
+      this.rain.visible = dl < 0.25;
+      if (this.rain.visible) {
+        this.rain.position.set(playerPos.x || 0, 0, playerPos.z || 0);
+        const p = this.rain.geometry.attributes.position;
+        for (let ri = 0; ri < p.count; ri++) {
+          let yy = p.getY(ri) - 36 * rDt;
+          if (yy < 0) yy += 38;
+          p.setY(ri, yy);
+        }
+        p.needsUpdate = true;
+      }
+    }
   }
 
   _buildRoadDetails() {

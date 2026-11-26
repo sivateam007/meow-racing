@@ -428,6 +428,32 @@ zero console errors.
 
 ---
 
+## Step 18 — Post-processing, reflections, clouds and rain
+
+> LABEL PATCH 1 — index.html — ADD importmap entries for `three/addons/` and the
+> EffectComposer/RenderPass/UnrealBloomPass modules.
+>
+> LABEL PATCH 2 — game.js — ADD imports, create a half-resolution EffectComposer with
+> UnrealBloomPass (strength 0.35, radius 0.4, threshold 0.85) inside try/catch with
+> `renderer.render` fallback; use `composer.render()` in `_loop()`.
+>
+> LABEL PATCH 3 — game.js — modulate bloom strength by day/night:
+> `0.12 + 0.55 * (1 - dayLight)`.
+>
+> LABEL PATCH 4 — world.js — ADD `_addSkyClouds()` (10 drifting sprites) and call from
+> `buildCity()`; drift sprites in `_updateDayNight()`.
+>
+> LABEL PATCH 5 — world.js — ADD `_addRainSystem()` (350 Points, visible only when
+> `dayLight < 0.25`, follows the player, wraps vertically).
+>
+> LABEL PATCH 6 — world.js — ADD `_addEnvironmentReflections()` with a procedural
+> CubeTexture assigned to building/glass and road materials.
+
+**Acceptance:** composer active with safe fallback, night neon glows, clouds move, rain
+appears at night, env reflections present, no console errors.
+
+---
+
 ## Final validation checklist (run after every step)
 
 ```powershell

@@ -1,4 +1,7 @@
 ﻿import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import anime from 'animejs';
 import { WORLD_CFG, CAR_CFG, SPEED_LEVELS, COLORS, INPUT, SURVIVAL, FUEL, PIZZA, TRAIN, TAXI, SHOP, VEHICLE_TYPES, MISSION_LIST, LEVEL_TITLES, clamp } from './config.js';
 import Car from './car.js';
@@ -92,6 +95,24 @@ export class Game {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.28;
+
+    this.composer = null;
+    this._bloomPass = null;
+    try {
+      const res = new THREE.Vector2(Math.max(1, width * 0.5), Math.max(1, height * 0.5));
+      const composer = new EffectComposer(this.renderer);
+      composer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+      composer.setSize(width, height);
+      composer.addPass(new RenderPass(this.scene, this.camera));
+      const bloomPass = new UnrealBloomPass(res, 0.35, 0.4, 0.85);
+      composer.addPass(bloomPass);
+      this.composer = composer;
+      this._bloomPass = bloomPass;
+    } catch (_e) {
+      this.composer = null;
+      this._bloomPass = null;
+    }
+
     if ('useLegacyLights' in this.renderer) {
       this.renderer.useLegacyLights = false;
     }
@@ -1924,7 +1945,17 @@ _updateMinimap() {
     this._updateCamera(dt);
     this._updateHud();
     this._updateMinimap();
-    this.renderer.render(this.scene, this.camera);
+    if (this._bloomPass && this.world && typeof this.world.lightPhase === 'number') {
+      const phase = ((this.world.lightPhase % 1) + 1) % 1;
+      const dayLight = clamp(0.5 + 0.5 * Math.cos(phase * Math.PI * 2), 0, 1);
+      this._bloomPass.strength = 0.12 + 0.55 * (1 - dayLight);
+    }
+    if (this.composer) {
+      try { this.composer.render(); }
+      catch (_e) { this.renderer.render(this.scene, this.camera); }
+    } else {
+      this.renderer.render(this.scene, this.camera);
+    }
 
     requestAnimationFrame(this._loop);
   }
