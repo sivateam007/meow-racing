@@ -357,6 +357,29 @@ HUD chips; SPD label stays on one line; zero console errors.
 
 ---
 
+## Step 15 — Slide steering and detailed vehicle models
+
+> LABEL PATCH 1 — index.html — REPLACE `.steering-ring` with #steer-slider/#steer-knob
+> plus the existing #touch-left/#touch-right buttons.
+>
+> LABEL PATCH 2 — game.js — ADD pointerdown/move/up slider binding in `_bindEvents()`:
+> normalized x in -1..1 into `this.touchInput.steer`, knob transform, reset on release.
+> `_readInput()` returns `steer` (car.js already supports numeric `input.steer`).
+>
+> LABEL PATCH 3 — css/style.css — slider track/knob styling, glow, safe-area/landscape rules.
+>
+> LABEL PATCH 4 — car.js — REPLACE generic body/cabin block in `setVehicleType()` with
+> realistic car silhouette (hood, windshield, boot, bumpers, lights, grille, mirrors, arches)
+> and a distinct bike silhouette (frame, fairing, seat, handlebars, rider).
+>
+> LABEL PATCH 5 — world.js — REPLACE the bike branch in `_createVehicleMesh()` with a
+> detailed bike (tyres, frame, tank, seat, handlebars, headlight, rider, helmet).
+
+**Acceptance:** dragging slider steers, release recenters; pods do not overlap HUD/minimap;
+player car and bikes have distinct detailed silhouettes; zero console errors.
+
+---
+
 ## Final validation checklist (run after every step)
 
 ```powershell

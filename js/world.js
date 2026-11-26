@@ -1068,26 +1068,62 @@ _addGroundAO() {
     const hazardMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
     const lightMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
 
-    if (typeKey.includes('bike')) {
-      const wr = 0.38;
-      const wg = new THREE.CylinderGeometry(wr, wr, 0.22, 12);
-      wg.rotateZ(Math.PI * 0.5);
-      for (const zOff of [l * 0.36, -l * 0.36]) {
-        const wm = new THREE.Mesh(wg, tireMat);
-        wm.position.set(0, wr, zOff);
-        group.add(wm);
-        wheels.push(wm);
-      }
-      const frame = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.45, l * 0.72), bodyMat);
-      frame.position.set(0, wr + 0.28, 0);
+if (typeKey.includes('bike')) {
+      const wheelR = spec.wheelRadius || 0.38;
+      const wheelGeo = new THREE.CylinderGeometry(wheelR, wheelR, 0.24, 14);
+      wheelGeo.rotateZ(Math.PI * 0.5);
+      const tireMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.85 });
+      const bodyMat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.3, metalness: 0.45 });
+      const trimMat = new THREE.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 0.25, metalness: 0.8 });
+      const seatMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.7 });
+      const skinMat = new THREE.MeshStandardMaterial({ color: 0xf1c27d, roughness: 0.7 });
+      const headLightMat = new THREE.MeshBasicMaterial({ color: 0xfef9c3 });
+
+      const frontWheel = new THREE.Mesh(wheelGeo, tireMat);
+      frontWheel.position.set(0, wheelR, spec.l * 0.34);
+      frontWheel.castShadow = true;
+      group.add(frontWheel);
+
+      const rearWheel = new THREE.Mesh(wheelGeo, tireMat);
+      rearWheel.position.set(0, wheelR, -spec.l * 0.34);
+      rearWheel.castShadow = true;
+      group.add(rearWheel);
+
+      const frame = new THREE.Mesh(new THREE.BoxGeometry(0.22, spec.h * 0.38, spec.l * 0.68), trimMat);
+      frame.position.set(0, wheelR + spec.h * 0.24, 0);
+      frame.castShadow = true;
       group.add(frame);
-      const rider = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.58, 0.32), darkMat);
-      rider.position.set(0, wr + 0.74, -0.06);
-      group.add(rider);
-      const helmet = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.36, 0.38), hazardMat);
-      helmet.position.set(0, wr + 1.18, 0.02);
+
+      const tank = new THREE.Mesh(new THREE.BoxGeometry(0.42, spec.h * 0.28, spec.l * 0.34), bodyMat);
+      tank.position.set(0, wheelR + spec.h * 0.44, spec.l * 0.08);
+      tank.castShadow = true;
+      group.add(tank);
+
+      const seat = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.16, spec.l * 0.34), seatMat);
+      seat.position.set(0, wheelR + spec.h * 0.42, -spec.l * 0.18);
+      seat.castShadow = true;
+      group.add(seat);
+
+      const bars = new THREE.Mesh(new THREE.BoxGeometry(0.76, 0.1, 0.14), trimMat);
+      bars.position.set(0, wheelR + spec.h * 0.62, spec.l * 0.24);
+      group.add(bars);
+
+      const headlight = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 8), headLightMat);
+      headlight.position.set(0, wheelR + spec.h * 0.52, spec.l * 0.36);
+      group.add(headlight);
+
+      const riderTorso = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.56, 0.26), bodyMat);
+      riderTorso.position.set(0, wheelR + spec.h * 0.72, -0.05);
+      riderTorso.rotation.x = 0.28;
+      riderTorso.castShadow = true;
+      group.add(riderTorso);
+
+      const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.21, 10, 10), skinMat);
+      helmet.position.set(0, wheelR + spec.h * 1.12, 0.04);
+      helmet.castShadow = true;
       group.add(helmet);
-      return { group, wheels };
+
+      return { group, wheels: [frontWheel, rearWheel] };
     }
 
     const wheelR = 0.42;
