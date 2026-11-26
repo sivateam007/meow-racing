@@ -380,6 +380,32 @@ player car and bikes have distinct detailed silhouettes; zero console errors.
 
 ---
 
+## Step 16 — Full map, city train loop, high-detail people and cars
+
+> LABEL PATCH 1 — game.js — REPLACE `_updateMinimap()` with a rectangular full-city map
+> (span = WORLD_CFG.gridSpan), no circular clip; draw streets, blocks, fuel/pizza/station/airport
+> icons, objective dashed route, objective ring, traffic and player arrow.
+>
+> LABEL PATCH 2 — css/style.css — REPLACE `.minimap-card` / `.minimap` with a 12px rounded
+> rectangle instead of a circle.
+>
+> LABEL PATCH 3 — world.js — REPLACE `_buildRailway()` to draw rails/sleepers along a
+> rectangular LOOP on street coordinates; store `this.trainLoop` and `this.trainDistance`.
+>
+> LABEL PATCH 4 — world.js — REPLACE `_updateTrain(dt)` + ADD `_trainPointAt(distance)`:
+> interpolate along the loop, orient each car by yaw, chain cars with spacing, spin wheels.
+>
+> LABEL PATCH 5 — world.js — REPLACE pedestrian mesh creation with detailed people
+> (hair, face, jacket/collar, belt, bag, shoes, hands, varied skin/shirt colours) while keeping
+> the animated limb refs.
+>
+> LABEL PATCH 6 — car.js — ADD realistic rims, glass tint, wipers, plates and bike mirrors.
+
+**Acceptance:** full map shows route during delivery; train stays on roads in a loop and never
+enters buildings; people/cars have distinct detailed silhouettes; zero console errors.
+
+---
+
 ## Final validation checklist (run after every step)
 
 ```powershell

@@ -1321,41 +1321,101 @@ if (typeKey.includes('bike')) {
     const limbGeo = new THREE.BoxGeometry(0.16, 0.56, 0.16);
 
     for (let i = 0; i < PED_CFG.poolSize; i++) {
-      const shirtColor = PED_CFG.shirtColors[i % PED_CFG.shirtColors.length];
-      const shirtMat = new THREE.MeshStandardMaterial({ color: shirtColor, roughness: 0.65 });
 
       const root = new THREE.Group();
-      const bodyPivot = new THREE.Group();
-      bodyPivot.position.y = 0.56;
-      root.add(bodyPivot);
+const skinColors = [0xf1c27d, 0xe0ac69, 0x8d5524, 0xc68642, 0xffdbac];
+    const shirtColors = [0x2563eb, 0xdc2626, 0x16a34a, 0xd97706, 0x475569, 0x0891b2];
+    const hairColors = [0x1e1b18, 0x451a03, 0x78350f, 0xd97706, 0x334155];
 
-      const torso = new THREE.Mesh(torsoGeo, shirtMat);
-      torso.position.y = 0.32;
-      torso.castShadow = true;
-      bodyPivot.add(torso);
+    const bodyPivot = new THREE.Group();
+    const skinMat = new THREE.MeshStandardMaterial({ color: skinColors[i % skinColors.length], roughness: 0.72 });
+    const shirtMat = new THREE.MeshStandardMaterial({ color: shirtColors[(i * 3) % shirtColors.length], roughness: 0.65 });
+    const hairMat = new THREE.MeshStandardMaterial({ color: hairColors[(i * 2) % hairColors.length], roughness: 0.85 });
+    const shoeMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.75 });
+    const beltMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5, metalness: 0.4 });
+    const packMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.8 });
 
-      const head = new THREE.Mesh(headGeo, headMat);
-      head.position.y = 0.82;
-      head.castShadow = true;
-      bodyPivot.add(head);
+    // Torso / jacket + collar + belt
+    const torso = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.66, 0.28), shirtMat);
+    torso.position.set(0, 1.02, 0);
+    torso.castShadow = true;
+    bodyPivot.add(torso);
 
-      const leftLeg = new THREE.Mesh(limbGeo, legMat);
-      leftLeg.position.set(-0.12, -0.28, 0);
-      bodyPivot.add(leftLeg);
+    const collar = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.1, 0.3), shoeMat);
+    collar.position.set(0, 1.36, 0);
+    bodyPivot.add(collar);
 
-      const rightLeg = new THREE.Mesh(limbGeo, legMat);
-      rightLeg.position.set(0.12, -0.28, 0);
-      bodyPivot.add(rightLeg);
+    const belt = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.08, 0.3), beltMat);
+    belt.position.set(0, 0.72, 0);
+    bodyPivot.add(belt);
 
-      const leftArm = new THREE.Mesh(limbGeo, shirtMat);
-      leftArm.scale.set(0.85, 0.85, 0.85);
-      leftArm.position.set(-0.32, 0.34, 0);
-      bodyPivot.add(leftArm);
+    if (i % 2 === 0) {
+      const pack = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.44, 0.18), packMat);
+      pack.position.set(0, 1.04, -0.22);
+      pack.castShadow = true;
+      bodyPivot.add(pack);
+    }
 
-      const rightArm = new THREE.Mesh(limbGeo, shirtMat);
-      rightArm.scale.set(0.85, 0.85, 0.85);
-      rightArm.position.set(0.32, 0.34, 0);
-      bodyPivot.add(rightArm);
+    // Rounded head + hair cap + nose
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.21, 12, 10), skinMat);
+    head.position.set(0, 1.56, 0);
+    head.castShadow = true;
+    bodyPivot.add(head);
+
+    const hair = new THREE.Mesh(new THREE.SphereGeometry(0.225, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), hairMat);
+    hair.position.set(0, 1.58, -0.02);
+    hair.rotation.x = -0.15;
+    bodyPivot.add(hair);
+
+    const nose = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.07, 0.08), skinMat);
+    nose.position.set(0, 1.54, 0.21);
+    bodyPivot.add(nose);
+
+    // Arms + hands + legs + shoes
+    const armGeo = new THREE.BoxGeometry(0.15, 0.56, 0.15);
+    const handGeo = new THREE.BoxGeometry(0.14, 0.14, 0.14);
+    const legGeo = new THREE.BoxGeometry(0.18, 0.66, 0.18);
+    const shoeGeo = new THREE.BoxGeometry(0.2, 0.12, 0.3);
+
+    const leftArm = new THREE.Group();
+    leftArm.position.set(-0.35, 1.28, 0);
+    const lArmMesh = new THREE.Mesh(armGeo, shirtMat);
+    lArmMesh.position.y = -0.26;
+    lArmMesh.castShadow = true;
+    const lHand = new THREE.Mesh(handGeo, skinMat);
+    lHand.position.y = -0.56;
+    leftArm.add(lArmMesh, lHand);
+    bodyPivot.add(leftArm);
+
+    const rightArm = new THREE.Group();
+    rightArm.position.set(0.35, 1.28, 0);
+    const rArmMesh = new THREE.Mesh(armGeo, shirtMat);
+    rArmMesh.position.y = -0.26;
+    rArmMesh.castShadow = true;
+    const rHand = new THREE.Mesh(handGeo, skinMat);
+    rHand.position.y = -0.56;
+    rightArm.add(rArmMesh, rHand);
+    bodyPivot.add(rightArm);
+
+    const leftLeg = new THREE.Group();
+    leftLeg.position.set(-0.14, 0.68, 0);
+    const lLegMesh = new THREE.Mesh(legGeo, beltMat);
+    lLegMesh.position.y = -0.33;
+    lLegMesh.castShadow = true;
+    const lShoe = new THREE.Mesh(shoeGeo, shoeMat);
+    lShoe.position.set(0, -0.62, 0.05);
+    leftLeg.add(lLegMesh, lShoe);
+    bodyPivot.add(leftLeg);
+
+    const rightLeg = new THREE.Group();
+    rightLeg.position.set(0.14, 0.68, 0);
+    const rLegMesh = new THREE.Mesh(legGeo, beltMat);
+    rLegMesh.position.y = -0.33;
+    rLegMesh.castShadow = true;
+    const rShoe = new THREE.Mesh(shoeGeo, shoeMat);
+    rShoe.position.set(0, -0.62, 0.05);
+    rightLeg.add(rLegMesh, rShoe);
+    bodyPivot.add(rightLeg);
 
       this.pedGroup.add(root);
 
@@ -2381,85 +2441,69 @@ _buildFuelStation() {
 
   
 
-  _buildRailway() {
-    if (!this.scene) return;
-    if (!this.railwayGroup) {
-      this.railwayGroup = new THREE.Group();
-      this.scene.add(this.railwayGroup);
-    }
-    this.railwayGroup.clear();
+_buildRailway() {
+    if (!this.cityGroup || typeof THREE === 'undefined') return;
+    const coords = Array.isArray(this.streetCoords) && this.streetCoords.length >= 4
+      ? this.streetCoords
+      : [-180, -60, 60, 180];
 
-    const halfSpan = WORLD_CFG.halfSpan || 260;
-    const trackLen = halfSpan * 2.1;
-    this.railX = (WORLD_CFG.roadWidth || 14) * 0.5 + (WORLD_CFG.blockSize || 44) * 4 + (WORLD_CFG.blockSize || 44) * 0.5;
-    this.railZ = 0;
+    const i1 = Math.floor(coords.length * 0.25);
+    const i2 = Math.floor(coords.length * 0.5);
+    const i3 = Math.min(coords.length - 1, Math.floor(coords.length * 0.75));
 
-    const railMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.3, metalness: 0.85 });
+    const cMin = coords[i1];
+    const cMid = coords[i2];
+    const cMax = coords[i3];
+
+    this.trainLoop = [
+      { x: cMin, z: cMin },
+      { x: cMax, z: cMin },
+      { x: cMax, z: cMax },
+      { x: cMin, z: cMax }
+    ];
+    this.trainDistance = 0;
+    this.railX = cMin;
+
+    const railMat = new THREE.MeshStandardMaterial({ color: 0x64748b, metalness: 0.75, roughness: 0.35 });
     const sleeperMat = new THREE.MeshStandardMaterial({ color: 0x451a03, roughness: 0.9 });
-    const platMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.75 });
-    const roofMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5, metalness: 0.4 });
-    const benchMat = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.65 });
+    const platformMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.7 });
 
-    for (const rOff of [-0.75, 0.75]) {
-      const rail = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.18, trackLen), railMat);
-      rail.position.set(this.railX + rOff, 0.16, 0);
-      this.railwayGroup.add(rail);
+    for (let e = 0; e < this.trainLoop.length; e++) {
+      const a = this.trainLoop[e];
+      const b = this.trainLoop[(e + 1) % this.trainLoop.length];
+      const dx = b.x - a.x;
+      const dz = b.z - a.z;
+      const len = Math.hypot(dx, dz);
+      const yaw = Math.atan2(dx, dz);
+      const mx = (a.x + b.x) * 0.5;
+      const mz = (a.z + b.z) * 0.5;
+
+      for (const offset of [-0.65, 0.65]) {
+        const rail = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.16, len), railMat);
+        rail.position.set(mx + Math.cos(yaw) * offset, 0.08, mz - Math.sin(yaw) * offset);
+        rail.rotation.y = yaw;
+        rail.receiveShadow = true;
+        this.cityGroup.add(rail);
+      }
+
+      const sleeperCount = Math.max(4, Math.floor(len / 3.2));
+      const sleeperGeo = new THREE.BoxGeometry(2.1, 0.08, 0.32);
+      for (let s = 0; s <= sleeperCount; s++) {
+        const t = s / sleeperCount;
+        const sl = new THREE.Mesh(sleeperGeo, sleeperMat);
+        sl.position.set(a.x + dx * t, 0.04, a.z + dz * t);
+        sl.rotation.y = yaw;
+        this.cityGroup.add(sl);
+      }
+
+      if (e === 0) {
+        const plat = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.55, 16), platformMat);
+        plat.position.set(cMid + 2.4, 0.28, cMin);
+        plat.castShadow = true;
+        plat.receiveShadow = true;
+        this.cityGroup.add(plat);
+      }
     }
-
-    const sleeperGeo = new THREE.BoxGeometry(2.2, 0.1, 0.32);
-    for (let z = -halfSpan; z <= halfSpan; z += 2.2) {
-      const sleeper = new THREE.Mesh(sleeperGeo, sleeperMat);
-      sleeper.position.set(this.railX, 0.06, z);
-      this.railwayGroup.add(sleeper);
-    }
-
-    const platX = this.railX + 4.2;
-    const platform = new THREE.Mesh(new THREE.BoxGeometry(5.2, 0.9, 28), platMat);
-    platform.position.set(platX, 0.45, 0);
-    platform.castShadow = true;
-    platform.receiveShadow = true;
-    this.railwayGroup.add(platform);
-
-    const canopy = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.4, 22), roofMat);
-    canopy.position.set(platX, 4.4, 0);
-    canopy.castShadow = true;
-    this.railwayGroup.add(canopy);
-
-    for (const pz of [-8, 0, 8]) {
-      const pillar = new THREE.Mesh(new THREE.BoxGeometry(0.35, 3.5, 0.35), roofMat);
-      pillar.position.set(platX, 2.65, pz);
-      this.railwayGroup.add(pillar);
-    }
-
-    const bench = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.55, 3.2), benchMat);
-    bench.position.set(platX + 0.8, 1.18, -4);
-    this.railwayGroup.add(bench);
-
-    const canvas = document.createElement('canvas');
-    canvas.width = 512;
-    canvas.height = 96;
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#0f172a';
-    ctx.fillRect(0, 0, 512, 96);
-    ctx.strokeStyle = '#38bdf8';
-    ctx.lineWidth = 6;
-    ctx.strokeRect(4, 4, 504, 88);
-    ctx.fillStyle = '#f8fafc';
-    ctx.font = '900 34px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('CENTRAL STATION', 256, 50);
-    const signTex = new THREE.CanvasTexture(canvas);
-    signTex.colorSpace = THREE.SRGBColorSpace;
-    const sign = new THREE.Mesh(
-      new THREE.PlaneGeometry(12, 2.2),
-      new THREE.MeshBasicMaterial({ map: signTex, side: THREE.DoubleSide })
-    );
-    sign.position.set(platX + 0.4, 5.8, 0);
-    sign.rotation.y = Math.PI * 0.5;
-    this.railwayGroup.add(sign);
-
-    this.stationPosition = { x: platX, z: 0 };
   }
 
 
@@ -2538,26 +2582,67 @@ _buildFuelStation() {
     }
   }
 
-  _updateTrain(dt) {
-    if (!Array.isArray(this.trainCars) || this.trainCars.length === 0) return;
-    const safeDt = Math.min(dt, 0.05);
-    const speed = (typeof TRAIN !== 'undefined' && TRAIN.speed) || 18;
-    const carLen = (typeof TRAIN !== 'undefined' && TRAIN.carLength) || 9;
-    const halfSpan = WORLD_CFG.halfSpan || 260;
-    const railX = typeof this.railX === 'number' ? this.railX : 203;
-
-    this.trainZ = (typeof this.trainZ === 'number' ? this.trainZ : -halfSpan + 20) + speed * safeDt;
-    if (this.trainZ > halfSpan + carLen * 2) {
-      this.trainZ = -halfSpan - carLen * 2;
+_trainPointAt(distance) {
+    const loop = Array.isArray(this.trainLoop) ? this.trainLoop : [];
+    if (loop.length < 2) {
+      return { x: this.railX || 0, z: distance || 0, yaw: 0 };
     }
 
-    const wheelDelta = (speed * safeDt) / 0.45;
+    const segs = [];
+    let totalLen = 0;
+    for (let i = 0; i < loop.length; i++) {
+      const a = loop[i];
+      const b = loop[(i + 1) % loop.length];
+      const dx = b.x - a.x;
+      const dz = b.z - a.z;
+      const len = Math.hypot(dx, dz) || 1;
+      segs.push({ a, b, dx, dz, len, start: totalLen, end: totalLen + len });
+      totalLen += len;
+    }
+
+    const d = ((distance % totalLen) + totalLen) % totalLen;
+    for (let i = 0; i < segs.length; i++) {
+      const s = segs[i];
+      if (d <= s.end || i === segs.length - 1) {
+        const t = clamp((d - s.start) / s.len, 0, 1);
+        return {
+          x: s.a.x + s.dx * t,
+          z: s.a.z + s.dz * t,
+          yaw: Math.atan2(s.dx, s.dz)
+        };
+      }
+    }
+    return { x: loop[0].x, z: loop[0].z, yaw: 0 };
+  }
+
+  _updateTrain(dt = 0) {
+    if (!Array.isArray(this.trainCars) || this.trainCars.length === 0) return;
+    const safeDt = Math.min(Math.max(dt, 0), 0.05);
+    const speed = (typeof TRAIN !== 'undefined' && typeof TRAIN.speed === 'number') ? TRAIN.speed : 16;
+    const carSpacing = (typeof TRAIN !== 'undefined' && typeof TRAIN.carSpacing === 'number') ? TRAIN.carSpacing : 9.6;
+
+    this.trainDistance = (typeof this.trainDistance === 'number' ? this.trainDistance : 0) + speed * safeDt;
+    this.trainZ = this.trainDistance;
+
     for (let i = 0; i < this.trainCars.length; i++) {
-      const tc = this.trainCars[i];
-      tc.group.position.set(railX, 0.2, this.trainZ - i * (carLen + 0.6));
-      tc.group.rotation.y = 0;
-      for (let w = 0; w < tc.wheels.length; w++) {
-        tc.wheels[w].rotation.x -= wheelDelta;
+      const carObj = this.trainCars[i];
+      if (!carObj) continue;
+      const pt = this._trainPointAt(this.trainDistance - i * carSpacing);
+      if (carObj.position) {
+        carObj.position.set(pt.x, 0.2, pt.z);
+        carObj.rotation.y = pt.yaw;
+      } else if (carObj.group) {
+        carObj.group.position.set(pt.x, 0.2, pt.z);
+        carObj.group.rotation.y = pt.yaw;
+      }
+    }
+
+    if (Array.isArray(this.trainWheels)) {
+      for (let i = 0; i < this.trainWheels.length; i++) {
+        const w = this.trainWheels[i];
+        if (w && w.rotation) {
+          w.rotation.x += speed * safeDt * 1.4;
+        }
       }
     }
   }

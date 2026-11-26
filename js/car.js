@@ -346,6 +346,63 @@ const trimMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5
       spoiler.position.set(0, roofY + 0.06, l * 0.4);
       this.chassis.add(spoiler);
     }
+
+const rimMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.85, roughness: 0.22 });
+    const glassMat = new THREE.MeshStandardMaterial({
+      color: 0x7dd3fc,
+      transparent: true,
+      opacity: 0.42,
+      roughness: 0.1,
+      metalness: 0.8
+    });
+    const wiperMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.6 });
+    const plateMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
+    const stripeMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.4 });
+
+    if (Array.isArray(this.wheels)) {
+      for (let wIdx = 0; wIdx < this.wheels.length; wIdx++) {
+        const wheel = this.wheels[wIdx];
+        if (!wheel) continue;
+        const spokeCross = new THREE.Mesh(new THREE.BoxGeometry(0.06, wheelR * 1.45, wheelR * 1.45), rimMat);
+        spokeCross.rotation.x = Math.PI * 0.25;
+        wheel.add(spokeCross);
+      }
+    }
+
+    const plate = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.14, 0.04), plateMat);
+    plate.position.set(0, wheelR + lowerH * 0.24, -l * 0.5);
+    this.chassis.add(plate);
+
+    const exhaustTip = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.09, 0.28, 8), rimMat);
+    exhaustTip.rotation.x = Math.PI * 0.5;
+    exhaustTip.position.set(bodyW * 0.32, wheelR + 0.14, -l * 0.51);
+    this.chassis.add(exhaustTip);
+
+    if (typeKey.includes('bike')) {
+      for (const side of [-1, 1]) {
+        const bMirror = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.1, 0.1), rimMat);
+        bMirror.position.set(side * (bodyW * 0.62), wheelR + lowerH * 1.24, l * 0.22);
+        this.chassis.add(bMirror);
+      }
+      const disc = new THREE.Mesh(new THREE.CylinderGeometry(wheelR * 0.65, wheelR * 0.65, 0.04, 12), rimMat);
+      disc.rotation.z = Math.PI * 0.5;
+      disc.position.set(0, wheelR, l * 0.34);
+      this.chassis.add(disc);
+    } else {
+      const roofStripe = new THREE.Mesh(new THREE.BoxGeometry(bodyW * 0.18, 0.04, l * 0.44), stripeMat);
+      roofStripe.position.set(0, wheelR + lowerH * 0.78 + Math.max(0.38, h - lowerH * 0.45) * 0.92, -l * 0.04);
+      this.chassis.add(roofStripe);
+
+      const glassTint = new THREE.Mesh(new THREE.BoxGeometry(bodyW * 0.85, Math.max(0.32, h - lowerH * 0.45) * 0.68, l * 0.44), glassMat);
+      glassTint.position.set(0, wheelR + lowerH * 0.78 + Math.max(0.38, h - lowerH * 0.45) * 0.45, -l * 0.04);
+      this.chassis.add(glassTint);
+
+      const wiper = new THREE.Mesh(new THREE.BoxGeometry(bodyW * 0.42, 0.04, 0.05), wiperMat);
+      wiper.position.set(0, wheelR + lowerH * 0.92, l * 0.24);
+      wiper.rotation.x = -0.35;
+      this.chassis.add(wiper);
+    }
+
   }
 
   setBodyColor(hex) {
@@ -364,7 +421,6 @@ const trimMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5
     }
     this.bodyColor = hex;
   }
-
   setSpeedLevel(index = 1) {
     const i = clamp(Math.round(index), 0, SPEED_LEVELS.length - 1);
     const level = SPEED_LEVELS[i];
