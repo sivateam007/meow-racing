@@ -199,8 +199,6 @@ export class Game {
     });
 
     const touchMap = [
-      { id: 'touch-left', key: 'left' },
-      { id: 'touch-right', key: 'right' },
       { id: 'touch-gas', key: 'gas' },
       { id: 'touch-brake', key: 'brake' },
       { id: 'touch-nos', key: 'nos' }
