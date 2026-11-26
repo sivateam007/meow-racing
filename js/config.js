@@ -158,7 +158,7 @@ export const INPUT = {
   backward: ['KeyS', 'ArrowDown'],
   left: ['KeyA', 'ArrowLeft'],
   right: ['KeyD', 'ArrowRight'],
-  drift: ['Space']
+  nos: ['Space', 'ShiftLeft']
 };
 
 export function clamp(value, min, max) {

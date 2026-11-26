@@ -1016,3 +1016,9 @@ body::before {
 .color-swatch { width:28px; height:28px; min-width:28px; border-radius:50%; border:2px solid rgba(255,255,255,.45); cursor:pointer; }
 .color-swatch.active { border-color:#38bdf8; box-shadow:0 0 10px rgba(56,189,248,.7); }
 /* Night glow sprites in Three.js are additive and already mobile-landscape safe without extra CSS overrides. */
+
+/* === NOS BOOST === */
+.touch-nos { border-color: #a855f7; color: #e9d5ff; box-shadow: 0 0 14px rgba(168,85,247,.35); }
+.hud-nitro-chip { border-color: #a855f7; color: #e9d5ff; font-weight: 900; }
+.hud-nitro-chip.active { border-color: #ef4444; color: #fecaca; animation: nitroPulse 1s ease-in-out infinite; }
+@keyframes nitroPulse { 50% { box-shadow: 0 0 16px rgba(239,68,68,.7); } }

@@ -45,7 +45,7 @@ export class Game {
       right: false,
       gas: false,
       brake: false,
-      drift: false
+      nos: false
     };
 
     this._initScene();
@@ -136,7 +136,7 @@ export class Game {
       ...(INPUT.backward || []),
       ...(INPUT.left || []),
       ...(INPUT.right || []),
-      ...(INPUT.drift || [])
+      ...(INPUT.nos || [])
     ]);
 
     window.addEventListener('keydown', (e) => {
@@ -173,7 +173,7 @@ export class Game {
       this.touchInput.right = false;
       this.touchInput.gas = false;
       this.touchInput.brake = false;
-      this.touchInput.drift = false;
+      this.touchInput.nos = false;
     });
 
     const touchMap = [
@@ -181,7 +181,7 @@ export class Game {
       { id: 'touch-right', key: 'right' },
       { id: 'touch-gas', key: 'gas' },
       { id: 'touch-brake', key: 'brake' },
-      { id: 'touch-drift', key: 'drift' }
+      { id: 'touch-nos', key: 'nos' }
     ];
 
     for (const item of touchMap) {
@@ -497,14 +497,14 @@ export class Game {
     const backward = hasCode(INPUT.backward) || this.touchInput.brake;
     const left = hasCode(INPUT.left) || this.touchInput.left;
     const right = hasCode(INPUT.right) || this.touchInput.right;
-    const drift = hasCode(INPUT.drift) || this.touchInput.drift;
+    const nos = hasCode(INPUT.nos) || this.touchInput.nos;
 
     return {
       forward,
       backward,
       left,
       right,
-      drift
+      nos
     };
   }
 
@@ -1452,6 +1452,13 @@ _clearContinuousMarker() {
       speedBtn.setAttribute('aria-label', `Speed level ${idx + 1}: ${SPEED_LEVELS[idx].label}`);
     }
 
+    const nitroEl = document.getElementById('hud-nitro');
+    if (nitroEl) {
+      const nVal = Math.ceil((this.car && typeof this.car.nitro === 'number') ? this.car.nitro : 100);
+      nitroEl.textContent = `NOS ${nVal}%`;
+      nitroEl.classList.toggle('active', nVal < 30);
+    }
+
     const pizzaHud = document.getElementById('pizza-hud');
     if (pizzaHud) {
       const pizzaPos = this.car && typeof this.car.getPosition === 'function' ? this.car.getPosition() : { x: 0, z: 0 };
@@ -1709,7 +1716,7 @@ _clearContinuousMarker() {
 
     const input = this.state === 'play'
       ? this._readInput()
-      : { forward: false, backward: false, left: false, right: false, drift: false };
+      : { forward: false, backward: false, left: false, right: false, nos: false };
 
     if (this.state === 'play') {
       this.elapsedTime += dt;

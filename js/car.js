@@ -12,6 +12,8 @@ export class Car {
     this.lateralSpeed = 0;
     this.heading = 0;
     this.drifting = false;
+    this.nitro = 100;
+    this.boosting = false;
     this.steerAngle = 0;
     this.wheelSpin = 0;
     this.roll = 0;
@@ -299,7 +301,12 @@ setVehicleType(typeKey) {
     const backward = Boolean(input.backward);
     const left = Boolean(input.left);
     const right = Boolean(input.right);
-    const driftKey = Boolean(input.drift);
+    const nosKey = Boolean(input.nos);
+    this.nitro = clamp((typeof this.nitro === 'number' ? this.nitro : 100)
+      + (nosKey ? -28 : 9) * safeDt, 0, 100);
+    this.boosting = nosKey && this.nitro > 0 && (forward || this.speed > 0);
+    const accelMul = this.boosting ? 1.9 : 1;
+    const limitMul = this.boosting ? 1.4 : 1;
 
     let steerDir = 0;
     if (typeof input.steer === 'number' && Number.isFinite(input.steer) && Math.abs(input.steer) > 0.01) {
@@ -312,7 +319,7 @@ setVehicleType(typeKey) {
 
     const movingForward = this.speed >= 0;
     if (forward && !backward) {
-      this.speed += this.accel * safeDt;
+      this.speed += this.accel * accelMul * safeDt;
     } else if (backward && !forward) {
       if (this.speed > 1.5) {
         this.speed -= CAR_CFG.brakeDecel * safeDt;
@@ -325,8 +332,8 @@ setVehicleType(typeKey) {
       else if (this.speed < 0) this.speed = Math.min(0, this.speed + decel);
     }
 
-    this.drifting = driftKey && Math.abs(this.speed) > 9 && Math.abs(steerDir) > 0.05;
-    const maxFwd = this.drifting ? this.driftMaxSpeed : this.maxSpeed;
+    this.drifting = false;
+    const maxFwd = this.maxSpeed * limitMul;
     this.speed = clamp(this.speed, -CAR_CFG.reverseMaxSpeed, maxFwd);
 
     const reverseSign = this.speed < -0.25 ? -1 : 1;
